@@ -92,3 +92,8 @@ This needs a quadrature rotary encoder connected to pins 21 and 22.
 
 Run rotary_encoder.py and see the leds change when yor turn the knob.
 
+### seven_segment
+
+This needs a Digilent 7-segment Pmod in the top row of pmod2 and pmod3 (the side opposite the usb connectors).
+
+Run seven_test.py to run it on the board or seven_seg_sim.py for a nice simulation.
