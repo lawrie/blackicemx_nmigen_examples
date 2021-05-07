@@ -97,3 +97,17 @@ Run rotary_encoder.py and see the leds change when yor turn the knob.
 This needs a Digilent 7-segment Pmod in the top row of pmod2 and pmod3 (the side opposite the usb connectors).
 
 Run seven_test.py to run it on the board or seven_seg_sim.py for a nice simulation.
+
+### oled
+
+This needs a 7-pin spi ssd1331 oled display and a Pmod or other means to connect it to pmod5.
+
+Run top_oled_vga.py to put a pattern on the display.
+
+### st7789
+
+This needs a 7-pin spi st7789 display and a Pmod or other means to connect it to pmod5.
+
+The st7789 is a 240x240 color display, as opposed to the 96x64 resolution of the sdd1331, but the prices are similar.
+
+Run st7789_test.py to get a pattern on the display.
