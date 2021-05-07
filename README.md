@@ -4,7 +4,7 @@
 
 These are examples for the Blackice MX ice40 FPGA, written in the python-based nmigen HDL.
 
-You will need to install a version of nmigen-boards with Blackice MX support.
+You will need to install a version of [nmigen-boards](https://github.com/folknology/nmigen-boards) with Blackice MX support.
 
 To run the blinky example on Linux, plug in your Blackice MX board and do:
 
@@ -46,7 +46,7 @@ e.g. do `screen /dev/ttyACM0`
 
 These are audio examples from fpga4fun.com.
 
-They are set up for Digilent Amp2 Pmod in the bottom row of Pmod 5 (next to the usb connector), but you can just connect a speaker or earphones to pin 19.
+They are set up for Digilent Amp2 Pmod in the bottom row of pmod 5 (next to the usb connector), but you can just connect a speaker or earphones to pin 19.
 
 music1.py plays middle C.
 
@@ -72,7 +72,7 @@ When you press a key on the keyboard the scan codes are written in hex to the ua
 
 ### mitecpu
 
-This is a tiny 8-bit cpu with a python assembler.
+This is a [tiny 8-bit cpu](https://github.com/jbush001/MiteCPU) with a python assembler.
 
 The least significant bits of the accumulator are mapped to the cpu.
 
@@ -80,7 +80,7 @@ Assemble programs with assemble.py and run them with mitecpu.py.
 
 ### opc
 
-This is an nmigen version of the opc6 16-bit one page CPU.
+This is an nmigen version of the [opc6](https://revaldinho.github.io/opc/) 16-bit one page CPU.
 
 Assemble programs with opc6asm.py and run them with opc6_sim.py of opc_test.py.
 
