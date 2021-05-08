@@ -111,3 +111,10 @@ This needs a 7-pin spi st7789 display and a Pmod or other means to connect it to
 The st7789 is a 240x240 color display, as opposed to the 96x64 resolution of the sdd1331, but the prices are similar.
 
 Run st7789_test.py to get a pattern on the display.
+
+### vga
+
+This needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
+
+Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
+
