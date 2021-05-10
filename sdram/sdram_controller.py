@@ -49,8 +49,9 @@ class sdram_controller(Elaboratable):
             sdram.ras.eq(ctrl.sd_ras),
             sdram.cas.eq(ctrl.sd_cas),
             sdram.clk_en.eq(1),
+            sdram.clk.eq(ClockSignal("sdram")),
             # Set the controller input pins
-            ctrl.init.eq(~self.init),
+            ctrl.init.eq(self.init),
             ctrl.clkref.eq(self.clkref),
             ctrl.dinA.eq(self.data_in),
             ctrl.addrA.eq(self.address),

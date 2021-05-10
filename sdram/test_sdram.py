@@ -62,7 +62,7 @@ class Top(Elaboratable):
             m.d.sync += [
                 mem.clkref.eq(1),
                 mem.req_write.eq(1),
-                din.eq(0x02),
+                din.eq(0b101),
                 addr.eq(100)
             ]
         with m.If(cnt == 200):
