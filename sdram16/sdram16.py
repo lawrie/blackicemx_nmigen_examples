@@ -138,26 +138,26 @@ class Sdram(Elaboratable):
                         mode.eq(0)
                     ]
 
-                # CAS phase
-                with m.If((stage == STATE_CMD_CONT) & (mode != 0)):
-                    m.d.sdram += [
-                        sd_cmd.eq(Mux(mode[1], CMD_WRITE, CMD_READ)),
-                        self.sd_addr.eq(addr_r)
-                    ]
+            # CAS phase
+            with m.If((stage == STATE_CMD_CONT) & (mode != 0)):
+                m.d.sdram += [
+                    sd_cmd.eq(Mux(mode[1], CMD_WRITE, CMD_READ)),
+                    self.sd_addr.eq(addr_r)
+                ]
 
-                    with m.If(mode[1]):
-                        m.d.sdram += self.sd_dqm.eq(~ds_r)
-                    with m.Else():
-                        m.d.sdram += self.sd_dqm.eq(C(0b00,2))
+                with m.If(mode[1]):
+                    m.d.sdram += self.sd_dqm.eq(~ds_r)
+                with m.Else():
+                    m.d.sdram += self.sd_dqm.eq(C(0b00,2))
 
-                with m.If(stage == STATE_HIGHZ):
-                    m.d.sdram += [
-                        self.sd_dqm.eq(C(0b11,2)),
-                        mode[1].eq(0)
-                    ]
+            with m.If(stage == STATE_HIGHZ):
+                m.d.sdram += [
+                    self.sd_dqm.eq(C(0b11,2)),
+                    mode[1].eq(0)
+                ]
 
-                with m.If((stage == STATE_READ) & (mode != 0)):
-                    m.d.sdram += self.dout.eq(self.sd_data_in)
+            with m.If((stage == STATE_READ) & (mode != 0)):
+                m.d.sdram += self.dout.eq(self.sd_data_in)
 
         return m
 

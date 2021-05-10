@@ -67,7 +67,7 @@ class Top(Elaboratable):
         with m.If(cnt == 300):
             m.d.sync += [
                 mem.req_read.eq(1),
-                addr.eq(101)
+                addr.eq(100)
             ]
 
         # Show 3 bits of data from SDRAM on the leds
