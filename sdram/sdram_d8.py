@@ -2,8 +2,10 @@ from nmigen import *
 
 # Dual-port SDRAM controller with 8-bit reads and writes
 class Sdram(Elaboratable):
-    def __init__(self):
-
+    def __init__(self, DW=8, AW=21):
+        # Save parameters
+        self.DW          = DW # Data width of accesses
+        self.AW          = AW # Address width for accesses
         # Chip interface
         self.sd_data_in  = Signal(16)
         self.sd_data_out = Signal(16)
@@ -21,18 +23,18 @@ class Sdram(Elaboratable):
         self.we_out      = Signal()
 
         # Port A
-        self.addrA       = Signal(21) # Byte address
+        self.addrA       = Signal(AW) # Byte address
         self.weA         = Signal()
-        self.dinA        = Signal(8)
+        self.dinA        = Signal(DW)
         self.oeA         = Signal()
-        self.doutA       = Signal(8)
+        self.doutA       = Signal(DW)
 
         # Port B
-        self.addrB       = Signal(21) # Byte address
+        self.addrB       = Signal(AW) # Byte address
         self.weB         = Signal()
-        self.dinB        = Signal(8)
+        self.dinB        = Signal(DW)
         self.oeB         = Signal()
-        self.doutB       = Signal(8)
+        self.doutB       = Signal(DW)
         
     def elaborate(self, platform):
 
@@ -91,8 +93,8 @@ class Sdram(Elaboratable):
 
         sd_cmd = Signal(4)
         oe     = Signal()
-        addr   = Signal(21) # Byte address
-        din    = Signal(8)
+        addr   = Signal(self.AW) # Byte address
+        din    = Signal(self.DW)
         addr0  = Signal()
         
         # clkref chooses which port to use
@@ -116,9 +118,9 @@ class Sdram(Elaboratable):
             m.d.sdram += addr0.eq(addr[0])
 
         # Choose which half of 16-bit word to write
-        dout = Signal(8)
+        dout = Signal(self.DW)
 
-        m.d.comb += dout.eq(Mux(addr0, self.sd_data_in[0:8], self.sd_data_in[8:]))
+        m.d.comb += dout.eq(Mux(addr0, self.sd_data_in[0:self.DW], self.sd_data_in[self.DW:]))
 
         # State machine
         with m.If(q == STATE_CMD_READ):
