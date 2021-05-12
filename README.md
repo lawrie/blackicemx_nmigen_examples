@@ -34,6 +34,8 @@ blinky.py blinks the blue led.
 
 leds.py count on the 4 leds.
 
+leds16.py counts on 2 digilent 8-LED Pmods, connected on pmods 2 and 3.
+
 ledglow.py makes all 4 leds glow using PWM.
 
 ### uart
@@ -98,6 +100,12 @@ This needs a Digilent 7-segment Pmod in the top row of pmod2 and pmod3 (the side
 
 Run seven_test.py to run it on the board or seven_seg_sim.py for a nice simulation.
 
+### seven_mixmod
+
+This needs a nystorm 7-segment Mixmod connected on mixmod 1.
+
+Run seven_test.py.
+
 ### oled
 
 This needs a 7-pin spi ssd1331 oled display and a Pmod or other means to connect it to pmod5.
@@ -118,3 +126,26 @@ This needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
 
 Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
 
+### sdram
+
+This is an 8-bit dual port SDRAM controller.
+
+Run test_sdram.py to test it.
+
+### sdram16
+
+This is a 16-bit single port SDRAM controller.
+
+Run test_sdram16.py to see the results on the leds: green means passed, red failed.
+
+### ws2812
+
+Test of ws2812b leds (neopixels).
+
+Run ws2812_test.py to test it with a 16-led neopixel ring.
+
+### ping
+
+Test of a 3.3v HC-SR04 ultrasonic (ping) sensor.
+
+Run ping_test.py and press button to take a measurement.
