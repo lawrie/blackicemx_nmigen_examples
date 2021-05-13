@@ -149,3 +149,10 @@ Run ws2812_test.py to test it with a 16-led neopixel ring.
 Test of a 3.3v HC-SR04 ultrasonic (ping) sensor.
 
 Run ping_test.py and press button to take a measurement.
+
+### ov7670
+
+Reads video from an OV7670 camera, and displays it in low resolution (60x60) on an st7789 color LCD display.
+
+Run camtest.py and press button 1 to configure the camera into RGB mode.
+
