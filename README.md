@@ -152,7 +152,15 @@ Run ping_test.py and press button to take a measurement.
 
 ### ov7670
 
+![ov7670](https://github.com/lawrie/lawrie.github.io/blob/master/images/mx_ov7670.jpg)
+
 Reads video from an OV7670 camera, and displays it in low resolution (60x60) on an st7789 color LCD display.
+
+Run camtest.py and press button 1 to configure the camera into RGB mode.
+
+### ov7670_sdram
+
+This is an SDRAM version of the OV7670 test with a 320x240 frame buffer.
 
 Run camtest.py and press button 1 to configure the camera into RGB mode.
 
