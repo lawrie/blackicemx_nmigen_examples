@@ -11,7 +11,9 @@ from vga import VGA
 from vga_timings import *
 from pll import PLL
 from sdram_controller16 import sdram_controller
+from osd import OSD
 
+# Digilent 4-bit per color VGA Pmod
 vga_pmod = [
     Resource("vga", 0,
              Subsignal("red", Pins("7 8 9 10", dir="o", conn=("pmod", 2)), Attrs(IO_STANDARD="SB_LVCMOS")),
@@ -21,6 +23,7 @@ vga_pmod = [
              Subsignal("vs", Pins("2", dir="o", conn=("pmod", 3)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
+# iCEBreaker Pmod with 3 buttons and 5 leds
 btn_led_pmod = [
     Resource("btn_led", 0,
              Subsignal("led_g", Pins("7 8 9 2", dir="o", conn=("pmod", 5)), Attrs(IO_STANDARD="SB_LVCMOS")),
@@ -28,6 +31,7 @@ btn_led_pmod = [
              Subsignal("btn", Pins("3 10 4", dir="i", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
+# OV7670 camera Pmod
 ov7670_pmod = [
     Resource("ov7670", 0,
              Subsignal("cam_data", Pins("2 17 3 18 4 19 10 25", dir="i", conn=("mixmod", 0)), Attrs(IO_STANDARD="SB_LVCMOS")),
@@ -39,6 +43,7 @@ ov7670_pmod = [
              Subsignal("cam_XCLK", Pins("11", dir="o", conn=("mixmod", 0)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
+# Image processing from OV7670 camera using SDRAM for frame buffer and VGA output
 class CamTest(Elaboratable):
     def __init__(self,
                  timing: VGATiming, # VGATiming class
@@ -89,7 +94,7 @@ class CamTest(Elaboratable):
         m.d.sdram += div.eq(div+1)
 
         # Power-on reset
-        reset = Signal(17, reset=0)
+        reset = Signal(16, reset=0)
         with m.If(~reset.all()):
             m.d.sdram += reset.eq(reset+1)
 
@@ -128,9 +133,12 @@ class CamTest(Elaboratable):
             camread.p_clock.eq(ov7670.cam_PCLK)
         ]
 
-        # Buttons and val
+        # Buttons and val for brightness etc.
         debup = Debouncer()
         m.submodules.debup = debup
+
+        osd_on = Signal(reset=1)
+        osd_val = Signal(3)
 
         val = Signal(signed(6))
         up_down = Signal()
@@ -138,27 +146,37 @@ class CamTest(Elaboratable):
         debdown = Debouncer()
         m.submodules.debdown = debdown
 
-        debres = Debouncer()
-        m.submodules.debres = debres
+        debosd = Debouncer()
+        m.submodules.debosd = debosd
 
         debfeat = Debouncer()
         m.submodules.debfeat = debfeat
 
+        xflip = Signal()
+        yflip = Signal()
+
         m.d.comb += [
             debup.btn.eq(up),
             debdown.btn.eq(down),
-            debres.btn.eq(btn2),
+            debosd.btn.eq(btn2),
             debfeat.btn.eq(feat)
         ]
 
         with m.If(debup.btn_down):
-            m.d.sync += val.eq(val+1)
+            with m.If(osd_on):
+                m.d.sync += osd_val.eq(osd_val+1)
+            with m.Elif(osd_val == 5): #xflip
+                m.d.sync += xflip.eq(1)
+            with m.Else():
+                m.d.sync += val.eq(val+1)
 
         with m.If(debdown.btn_down):
-            m.d.sync += val.eq(val-1)
-
-        with m.If(debres.btn_down):
-            m.d.sync += val.eq(0)
+            with m.If(osd_on):
+                m.d.sync += osd_val.eq(osd_val-1)
+            with m.Elif(osd_val == 5): #xflip
+                m.d.sync += xflip.eq(0)
+            with m.Else():
+                m.d.sync += val.eq(val-1)
 
         feature = Signal(4)
 
@@ -183,7 +201,7 @@ class CamTest(Elaboratable):
             ims.i_g.eq(camread.pixel_data[5:11]),
             ims.i_b.eq(camread.pixel_data[0:5]),
             #ims.edge.eq(sw8.sw[0]),
-            ims.edge.eq(0),
+            ims.edge.eq(feature[3]),
             #ims.red.eq(sw8.sw[1]),
             ims.red.eq(0),
             #ims.green.eq(sw8.sw[2]),
@@ -199,11 +217,12 @@ class CamTest(Elaboratable):
             ims.filter.eq(0),
             ims.mono.eq(feature[0]),
             ims.bright.eq(1),
-            ims.x_flip.eq(feature[1]),
-            ims.y_flip.eq(feature[2]),
+            ims.x_flip.eq(xflip),
+            ims.y_flip.eq(yflip),
             ims.val.eq(val)
         ]
 
+        # Frame-level statistics
         with m.If(ims.i_r > max_r):
             m.d.sync += max_r.eq(ims.i_r) 
         with m.If(ims.i_g > max_g):
@@ -244,14 +263,14 @@ class CamTest(Elaboratable):
         )
 
         # Write to SDRAM
-        raddr = Signal(20)
-        waddr = Signal(20)
-        read_pixel = Signal()
-        x = Signal(10)
-        x1 = Signal(10)
-        x2 = Signal(10)
-        xm2 = Signal(10)
-        y = Signal(10)
+        raddr = Signal(20)    # SDRAM read address
+        waddr = Signal(20)    # SDRAM write address
+        read_pixel = Signal() # Set when pixel is being read from SDRAM
+        x = Signal(10)        # VGA x co-ordinate
+        x1 = Signal(10)       # VGA x + 1
+        x2 = Signal(10)       # VGA X + 2
+        xm2 = Signal(10)      # VGA x - 1
+        y = Signal(10)        # VGA y
 
         m.d.comb += [
             x.eq(vga.o_beam_x),
@@ -272,7 +291,7 @@ class CamTest(Elaboratable):
 
         # Duplicate lines in line buffer
         m.d.comb += [
-            w.addr.eq(xm2[1:]),         # 0 - 319
+            w.addr.eq(xm2[1:]),         # 0 - 319, SDRAM data is 2 cycles late
             r.addr.eq(x1[1:]),          # 1 cycle to read
             w.data.eq(mem.data_out),    # Write data just read from SDRAM
             w.en.eq(~vga_blank & ~y[0]) # Write if first of 2 vertical lines
@@ -293,12 +312,30 @@ class CamTest(Elaboratable):
             vga_blank.eq(vga.o_vga_blank),
         ]
 
+        # Drive VGA pins
         vga_out = platform.request("vga")
 
+        # OSD
+        m.submodules.osd = osd = OSD()
+
+        with m.If(debosd.btn_down):
+            m.d.sync += osd_on.eq(~osd_on)
+
         m.d.comb += [
-            vga_out.red.eq(vga_r[4:]),
-            vga_out.green.eq(vga_g[4:]),
-            vga_out.blue.eq(vga_b[4:]),
+            osd.x.eq(x),
+            osd.y.eq(y),
+            osd.i_r.eq(vga.o_vga_r[4:]),
+            osd.i_g.eq(vga.o_vga_g[4:]),
+            osd.i_b.eq(vga.o_vga_b[4:]),
+            osd.on.eq(osd_on),
+            osd.osd_val.eq(osd_val)
+        ]
+
+
+        m.d.comb += [
+            vga_out.red.eq(osd.o_r),
+            vga_out.green.eq(osd.o_g),
+            vga_out.blue.eq(osd.o_b),
             vga_out.hs.eq(vga_hsync),
             vga_out.vs.eq(vga_vsync)
         ]
@@ -315,5 +352,5 @@ if __name__ == "__main__":
     platform.add_resources(vga_pmod)
     platform.add_resources(btn_led_pmod)
 
-    platform.build(m, do_program=True)
+    platform.build(m, do_program=True, nextpnr_opts="")
 
