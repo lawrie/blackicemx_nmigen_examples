@@ -89,7 +89,7 @@ class CamTest(Elaboratable):
         m.d.sdram += div.eq(div+1)
 
         # Power-on reset
-        reset = Signal(16, reset=0)
+        reset = Signal(17, reset=0)
         with m.If(~reset.all()):
             m.d.sdram += reset.eq(reset+1)
 
@@ -103,6 +103,10 @@ class CamTest(Elaboratable):
 
         m.domains.pixel = cd_pixel = ClockDomain("pixel")
         m.d.comb += ClockSignal("pixel").eq(div[1])
+
+        lb = Memory(width=16, depth=320)
+        m.submodules.r = r = lb.read_port()
+        m.submodules.w = w = lb.write_port()
 
         # Add CamRead submodule
         camread = CamRead()
@@ -239,33 +243,48 @@ class CamTest(Elaboratable):
            bits_y            = 16  # a smaller/larger value will make it pass timing.
         )
 
+        # Write to SDRAM
         raddr = Signal(20)
         waddr = Signal(20)
         read_pixel = Signal()
+        x = Signal(10)
+        x1 = Signal(10)
+        x2 = Signal(10)
+        xm2 = Signal(10)
+        y = Signal(10)
 
         m.d.comb += [
-            raddr.eq((vga.o_beam_y[1:] * 320) + vga.o_beam_x[1:]),
+            x.eq(vga.o_beam_x),
+            x1.eq(x + 1),
+            x2.eq(x + 2),
+            xm2.eq(x - 2),
+            y.eq(vga.o_beam_y),
+            raddr.eq((y[1:] * 320) + x2[1:]), # 2 cycles to read
             waddr.eq((ims.o_y * 320) + ims.o_x),
-            read_pixel.eq(vga.o_beam_x[1])
-        ]
-
-        # Write to SDRAM
-        m.d.comb += [
+            read_pixel.eq(x[1] & ~y[0]),
             mem.init.eq(~pll.locked), # Use pll not locked as signal to initialise SDRAM
-            mem.sync.eq(div[2]),      # Sync with 25MHz clock
+            mem.sync.eq(~div[2]),      # Sync with 25MHz clock
             mem.address.eq(Mux(read_pixel, raddr, waddr)),
             mem.data_in.eq(Cat(ims.o_b, ims.o_g, ims.o_r)),
-            mem.req_read.eq(div[2] & read_pixel), # Always read when pixel requested
-            mem.req_write.eq(div[2] & ~read_pixel & ims.ready) # Don't write when reading
+            mem.req_read.eq(~div[2] & read_pixel), # Always read when pixel requested
+            mem.req_write.eq(~div[2] & ~read_pixel & ims.ready) # Don't write when reading
+        ]
+
+        # Duplicate lines in line buffer
+        m.d.comb += [
+            w.addr.eq(xm2[1:]),         # 0 - 319
+            r.addr.eq(x1[1:]),          # 1 cycle to read
+            w.data.eq(mem.data_out),    # Write data just read from SDRAM
+            w.en.eq(~vga_blank & ~y[0]) # Write if first of 2 vertical lines
         ]
 
         # Generate VGA signals
         m.d.comb += [
             vga.i_clk_en.eq(1),
             vga.i_test_picture.eq(0),
-            vga.i_r.eq(Cat(Const(0, unsigned(3)), mem.data_out[11:])), 
-            vga.i_g.eq(Cat(Const(0, unsigned(2)), mem.data_out[5:11])), 
-            vga.i_b.eq(Cat(Const(0, unsigned(3)), mem.data_out[0:5])), 
+            vga.i_r.eq(Cat(Const(0, unsigned(3)), Mux(y[0], r.data[11:], mem.data_out[11:]))), 
+            vga.i_g.eq(Cat(Const(0, unsigned(2)), Mux(y[0], r.data[5:11], mem.data_out[5:11]))), 
+            vga.i_b.eq(Cat(Const(0, unsigned(3)), Mux(y[0], r.data[0:5], mem.data_out[0:5]))), 
             vga_r.eq(vga.o_vga_r),
             vga_g.eq(vga.o_vga_g),
             vga_b.eq(vga.o_vga_b),
