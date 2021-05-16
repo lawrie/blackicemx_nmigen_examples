@@ -8,7 +8,7 @@ class OSD(Elaboratable):
         self.width   = width
         self.height  = height
 
-        #inputs
+        # inputs
         self.on      = Signal()
         self.osd_val = Signal(3)
         self.i_r     = Signal(4)
@@ -16,11 +16,12 @@ class OSD(Elaboratable):
         self.i_b     = Signal(4)
         self.x       = Signal(10)
         self.y       = Signal(10)
+        self.sel     = Signal()
 
+        # outputs
         self.o_r     = Signal(4)
         self.o_g     = Signal(4)
         self.o_b     = Signal(4)
-
 
     def elaborate(self, platform):
         m = Module()
@@ -45,12 +46,21 @@ class OSD(Elaboratable):
                     self.o_b.eq(0)
                 ]
 
-                with m.If (y_offset[3:] == self.osd_val):
+                with m.If(y_offset[3:] == self.osd_val):
                     m.d.sync += [
                         self.o_r.eq(2),
                         self.o_g.eq(2),
                         self.o_b.eq(2)
                     ]
+
+                    with m.If(self.sel & ((self.x[:3] == 0) | (self.x[:3] == 7) |
+                                       (self.y[:3] == 0) | (self.y[:3] == 7))):
+                        m.d.sync += [
+                            self.o_r.eq(0xF),
+                            self.o_g.eq(0),
+                            self.o_b.eq(0)
+                        ]
+
 
                     with m.Switch(self.osd_val):
                         with m.Case(0): # brightness

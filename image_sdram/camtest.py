@@ -154,36 +154,43 @@ class CamTest(Elaboratable):
 
         xflip = Signal()
         yflip = Signal()
+        mono = Signal()
+        osd_sel = Signal()
 
         m.d.comb += [
             debup.btn.eq(up),
             debdown.btn.eq(down),
             debosd.btn.eq(btn2),
-            debfeat.btn.eq(feat)
+            debfeat.btn.eq(feat),
+            ledfeat.eq(Cat([mono, xflip, yflip]))
         ]
 
         with m.If(debup.btn_down):
-            with m.If(osd_on):
+            with m.If(osd_on & ~osd_sel):
                 m.d.sync += osd_val.eq(osd_val+1)
-            with m.Elif(osd_val == 5): #xflip
+            with m.Elif(osd_sel & (osd_val == 4)): # mono
+                m.d.sync += mono.eq(1)
+            with m.Elif(osd_sel & (osd_val == 5)): # xflip
                 m.d.sync += xflip.eq(1)
+            with m.Elif(osd_sel & (osd_val == 6)): # yflip
+                m.d.sync += yflip.eq(1)
             with m.Else():
                 m.d.sync += val.eq(val+1)
 
         with m.If(debdown.btn_down):
-            with m.If(osd_on):
+            with m.If(osd_on & ~osd_sel):
                 m.d.sync += osd_val.eq(osd_val-1)
-            with m.Elif(osd_val == 5): #xflip
+            with m.Elif(osd_sel & (osd_val == 4)): # mono
+                m.d.sync += mono.eq(0)
+            with m.Elif(osd_sel & (osd_val == 5)): # xflip
                 m.d.sync += xflip.eq(0)
+            with m.Elif(osd_sel & (osd_val == 6)): # yflip
+                m.d.sync += yflip.eq(0)
             with m.Else():
                 m.d.sync += val.eq(val-1)
 
-        feature = Signal(4)
-
         with m.If(debfeat.btn_down):
-            m.d.sync += feature.eq(feature+1)
-
-        m.d.comb += ledfeat.eq(feature)
+            m.d.sync += osd_sel.eq(~osd_sel)
 
         # Image stream
         max_r = Signal(5)
@@ -201,7 +208,7 @@ class CamTest(Elaboratable):
             ims.i_g.eq(camread.pixel_data[5:11]),
             ims.i_b.eq(camread.pixel_data[0:5]),
             #ims.edge.eq(sw8.sw[0]),
-            ims.edge.eq(feature[3]),
+            ims.edge.eq(0),
             #ims.red.eq(sw8.sw[1]),
             ims.red.eq(0),
             #ims.green.eq(sw8.sw[2]),
@@ -215,7 +222,7 @@ class CamTest(Elaboratable):
             ims.gamma.eq(0),
             #ims.filter.eq(sw8.sw[7]),
             ims.filter.eq(0),
-            ims.mono.eq(feature[0]),
+            ims.mono.eq(mono),
             ims.bright.eq(1),
             ims.x_flip.eq(xflip),
             ims.y_flip.eq(yflip),
@@ -319,8 +326,11 @@ class CamTest(Elaboratable):
         m.submodules.osd = osd = OSD()
 
         with m.If(debosd.btn_down):
-            m.d.sync += osd_on.eq(~osd_on)
-
+            m.d.sync += [
+                osd_on.eq(~osd_on),
+                osd_sel.eq(0)
+            ]
+            
         m.d.comb += [
             osd.x.eq(x),
             osd.y.eq(y),
@@ -328,7 +338,8 @@ class CamTest(Elaboratable):
             osd.i_g.eq(vga.o_vga_g[4:]),
             osd.i_b.eq(vga.o_vga_b[4:]),
             osd.on.eq(osd_on),
-            osd.osd_val.eq(osd_val)
+            osd.osd_val.eq(osd_val),
+            osd.sel.eq(osd_sel)
         ]
 
 
