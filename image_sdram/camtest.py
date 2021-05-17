@@ -134,30 +134,18 @@ class CamTest(Elaboratable):
             camread.p_clock.eq(ov7670.cam_PCLK)
         ]
 
-        # Buttons and valiues for brightness etc.
-        debup = Debouncer()
-        m.submodules.debup = debup
+        # Buttons and values for image processing options
+        m.submodules.debup = debup = Debouncer()
+        m.submodules.debdown = debdown = Debouncer()
+        m.submodules.debosd = debosd = Debouncer()
+        m.submodules.debsel = debsel = Debouncer()
 
+        # OSD control
         osd_on = Signal(reset=1)
         osd_val = Signal(4, reset=0)
+        osd_sel = Signal(reset=0)
 
-        brightness = Signal(signed(7), reset=0)
-        redness = Signal(signed(7), reset=0)
-        greenness = Signal(signed(7), reset=0)
-        blueness = Signal(signed(7), reset=0)
-        edge_thresh = Signal(signed(7), reset=10)
-        filt_thresh = Signal(signed(7), reset=30)
-
-        debdown = Debouncer()
-        m.submodules.debdown = debdown
-
-        debosd = Debouncer()
-        m.submodules.debosd = debosd
-
-        debsel = Debouncer()
-        m.submodules.debsel = debsel
-
-        # Image selection options
+        # Image processing options
         xflip = Signal(reset=0)
         yflip = Signal(reset=1)
         mono = Signal(reset=0)
@@ -167,7 +155,12 @@ class CamTest(Elaboratable):
         filt = Signal(reset=0)
         edge = Signal(reset=0)
 
-        osd_sel = Signal(reset=0)
+        brightness = Signal(signed(7), reset=0)
+        redness = Signal(signed(7), reset=0)
+        greenness = Signal(signed(7), reset=0)
+        blueness = Signal(signed(7), reset=0)
+        edge_thresh = Signal(signed(7), reset=10)
+        filt_thresh = Signal(signed(7), reset=30)
 
         m.d.comb += [
             debup.btn.eq(up),
@@ -178,7 +171,7 @@ class CamTest(Elaboratable):
             led_r.eq(edge)
         ]
 
-        # OSD
+        # OSD control
         with m.If(debup.btn_down):
             with m.If(osd_on & ~osd_sel):
                 m.d.sync += osd_val.eq(Mux(osd_val == 11, 0, osd_val+1))
@@ -374,7 +367,7 @@ class CamTest(Elaboratable):
 
         with m.If(debsel.btn_down & osd_on):
             m.d.sync += osd_sel.eq(~osd_sel)
-            
+
         m.d.comb += [
             osd.x.eq(x),
             osd.y.eq(y),
@@ -383,10 +376,8 @@ class CamTest(Elaboratable):
             osd.i_b.eq(vga.o_vga_b[4:]),
             osd.on.eq(osd_on),
             osd.osd_val.eq(osd_val),
-            osd.sel.eq(osd_sel)
-        ]
+            osd.sel.eq(osd_sel),
 
-        m.d.comb += [
             vga_out.red.eq(osd.o_r),
             vga_out.green.eq(osd.o_g),
             vga_out.blue.eq(osd.o_b),

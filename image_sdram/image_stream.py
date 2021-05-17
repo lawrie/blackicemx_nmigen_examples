@@ -24,7 +24,6 @@ class ImageStream(Elaboratable):
         self.y_flip      = Signal()
         self.mono        = Signal()
         self.invert      = Signal()
-        self.threshold   = Signal()
         self.gamma       = Signal()
         self.filter      = Signal()
         self.border      = Signal()
@@ -200,7 +199,7 @@ class ImageStream(Elaboratable):
             t_b.eq(g_b + self.blueness + self.brightness),
             n_r.eq(Mux(t_r > 0x1f, 0x1f, Mux(t_r < 0, 0, t_r))),
             n_g.eq(Mux(t_g > 0x3f, 0x3f, Mux(t_g < 0, 0, t_g))),
-            n_r.eq(Mux(t_b > 0x1f, 0x1f, Mux(t_b < 0, 0, t_b))),
+            n_b.eq(Mux(t_b > 0x1f, 0x1f, Mux(t_b < 0, 0, t_b))),
         ]
 
         # Process pixel when valid set, and set ready
