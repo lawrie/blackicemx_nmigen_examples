@@ -133,6 +133,42 @@ class OSD(Elaboratable):
                                     self.o_g.eq(0),
                                     self.o_b.eq(0xF)
                                 ]
+                        with m.Case(8): # Edge detection
+                            with m.If((yb == 4) & (xb > 2) & (xb < 6)):
+                                m.d.sync += [
+                                    self.o_r.eq(0xF),
+                                    self.o_g.eq(0),
+                                    self.o_b.eq(0)
+                                ]
+                        with m.Case(9): # Invert
+                            with m.If((xb > 1) & (xb < 6) &
+                                      (yb > 1) & (yb < 6)):
+                                with m.If(yb < 4):
+                                    m.d.sync += [
+                                        self.o_r.eq(0xF),
+                                        self.o_g.eq(0xF),
+                                        self.o_b.eq(0xF)
+                                    ]
+                                with m.Else():
+                                    m.d.sync += [
+                                        self.o_r.eq(0),
+                                        self.o_g.eq(0),
+                                        self.o_b.eq(0)
+                                    ]
+                        with m.Case(10): # Gamma
+                            with m.If((yb == 4) & (xb > 2) & (xb < 6)):
+                                m.d.sync += [
+                                    self.o_r.eq(0),
+                                    self.o_g.eq(0xF),
+                                    self.o_b.eq(0)
+                                ]
+                        with m.Case(11): # Filter
+                            with m.If((yb == 4) & (xb == 4)):
+                                m.d.sync += [
+                                    self.o_r.eq(0xF),
+                                    self.o_g.eq(0),
+                                    self.o_b.eq(0)
+                                ]
 
         return m
 

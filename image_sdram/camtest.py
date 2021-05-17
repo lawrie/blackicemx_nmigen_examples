@@ -95,7 +95,7 @@ class CamTest(Elaboratable):
         m.d.sdram += div.eq(div+1)
 
         # Power-on reset
-        reset = Signal(13, reset=0)
+        reset = Signal(16, reset=0)
         with m.If(~reset.all()):
             m.d.sdram += reset.eq(reset+1)
 
