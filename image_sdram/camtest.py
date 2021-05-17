@@ -78,8 +78,9 @@ class CamTest(Elaboratable):
         btn_led = platform.request("btn_led", 0)
         up = btn_led.btn[2]
         down = btn_led.btn[0]
-        feat = btn_led.btn[1]
+        sel = btn_led.btn[1]
         ledfeat = Cat([i for i in btn_led.led_g])
+        led_r = btn_led.led_r
         clk_in = platform.request(platform.default_clk, dir='-')[0]
 
         # Clock generator.
@@ -94,7 +95,7 @@ class CamTest(Elaboratable):
         m.d.sdram += div.eq(div+1)
 
         # Power-on reset
-        reset = Signal(16, reset=0)
+        reset = Signal(13, reset=0)
         with m.If(~reset.all()):
             m.d.sdram += reset.eq(reset+1)
 
@@ -133,15 +134,18 @@ class CamTest(Elaboratable):
             camread.p_clock.eq(ov7670.cam_PCLK)
         ]
 
-        # Buttons and val for brightness etc.
+        # Buttons and valiues for brightness etc.
         debup = Debouncer()
         m.submodules.debup = debup
 
         osd_on = Signal(reset=1)
-        osd_val = Signal(3)
+        osd_val = Signal(4, reset=0)
 
-        val = Signal(signed(6))
-        up_down = Signal()
+        val = Signal(signed(7), reset=0)
+        brightness = Signal(signed(7), reset=0)
+        redness = Signal(signed(7), reset=0)
+        greenness = Signal(signed(7), reset=0)
+        blueness = Signal(signed(7), reset=0)
 
         debdown = Debouncer()
         m.submodules.debdown = debdown
@@ -149,48 +153,85 @@ class CamTest(Elaboratable):
         debosd = Debouncer()
         m.submodules.debosd = debosd
 
-        debfeat = Debouncer()
-        m.submodules.debfeat = debfeat
+        debsel = Debouncer()
+        m.submodules.debsel = debsel
 
-        xflip = Signal()
-        yflip = Signal()
-        mono = Signal()
-        osd_sel = Signal()
+        xflip = Signal(reset=0)
+        yflip = Signal(reset=1)
+        mono = Signal(reset=0)
+        invert = Signal(reset=0)
+        gamma = Signal(reset=0)
+        border = Signal(reset=0)
+        filt = Signal(reset=0)
+        edge = Signal(reset=0)
+
+        osd_sel = Signal(reset=0)
 
         m.d.comb += [
             debup.btn.eq(up),
             debdown.btn.eq(down),
             debosd.btn.eq(btn2),
-            debfeat.btn.eq(feat),
-            ledfeat.eq(Cat([mono, xflip, yflip]))
+            debsel.btn.eq(sel),
+            ledfeat.eq(Cat([mono, xflip, yflip, border])),
+            led_r.eq(edge)
         ]
 
+        # OSD
         with m.If(debup.btn_down):
             with m.If(osd_on & ~osd_sel):
-                m.d.sync += osd_val.eq(osd_val+1)
-            with m.Elif(osd_sel & (osd_val == 4)): # mono
-                m.d.sync += mono.eq(1)
-            with m.Elif(osd_sel & (osd_val == 5)): # xflip
-                m.d.sync += xflip.eq(1)
-            with m.Elif(osd_sel & (osd_val == 6)): # yflip
-                m.d.sync += yflip.eq(1)
-            with m.Else():
-                m.d.sync += val.eq(val+1)
+                m.d.sync += osd_val.eq(Mux(osd_val == 11, 0, osd_val+1))
+            with m.Elif(osd_sel): 
+                with m.Switch(osd_val):
+                    with m.Case(0): # brightness
+                        m.d.sync += brightness.eq(brightness+1)
+                    with m.Case(1): # redness
+                        m.d.sync += redness.eq(redness+1)
+                    with m.Case(2): # greenness
+                        m.d.sync += greenness.eq(greenness+1)
+                    with m.Case(3): # blueness
+                        m.d.sync += blueness.eq(blueness+1)
+                    with m.Case(4): # mono
+                        m.d.sync += mono.eq(1)
+                    with m.Case(5): # x flip
+                        m.d.sync += xflip.eq(1)
+                    with m.Case(6): # y flip
+                        m.d.sync += yflip.eq(1)
+                    with m.Case(7): # border
+                        m.d.sync += border.eq(1)
+                    with m.Case(8): # edge detection
+                        m.d.sync += edge.eq(1)
+                    with m.Case(9): # invert
+                        m.d.sync += invert.eq(1)
+                    with m.Case(10): # gamma
+                        m.d.sync += gamma.eq(1)
 
         with m.If(debdown.btn_down):
             with m.If(osd_on & ~osd_sel):
-                m.d.sync += osd_val.eq(osd_val-1)
-            with m.Elif(osd_sel & (osd_val == 4)): # mono
-                m.d.sync += mono.eq(0)
-            with m.Elif(osd_sel & (osd_val == 5)): # xflip
-                m.d.sync += xflip.eq(0)
-            with m.Elif(osd_sel & (osd_val == 6)): # yflip
-                m.d.sync += yflip.eq(0)
-            with m.Else():
-                m.d.sync += val.eq(val-1)
-
-        with m.If(debfeat.btn_down):
-            m.d.sync += osd_sel.eq(~osd_sel)
+                m.d.sync += osd_val.eq(Mux(osd_val == 0, 11, osd_val-1))
+            with m.Elif(osd_sel): 
+                with m.Switch(osd_val):
+                    with m.Case(0): # brightness
+                        m.d.sync += brightness.eq(brightness-1)
+                    with m.Case(1): # redness
+                        m.d.sync += redness.eq(redness-1)
+                    with m.Case(2): # greenness
+                        m.d.sync += greenness.eq(greenness-1)
+                    with m.Case(3): # blueness
+                        m.d.sync += blueness.eq(blueness-1)
+                    with m.Case(4): # mono
+                        m.d.sync += mono.eq(0)
+                    with m.Case(5): # x flip
+                        m.d.sync += xflip.eq(0)
+                    with m.Case(6): # y flip
+                        m.d.sync += yflip.eq(0)
+                    with m.Case(7): # border
+                        m.d.sync += border.eq(0)
+                    with m.Case(8): # edge detection
+                        m.d.sync += edge.eq(0)
+                    with m.Case(9): # invert
+                        m.d.sync += invert.eq(0)
+                    with m.Case(10): # gamma
+                        m.d.sync += gamma.eq(0)
 
         # Image stream
         max_r = Signal(5)
@@ -207,26 +248,19 @@ class CamTest(Elaboratable):
             ims.i_r.eq(camread.pixel_data[11:]),
             ims.i_g.eq(camread.pixel_data[5:11]),
             ims.i_b.eq(camread.pixel_data[0:5]),
-            #ims.edge.eq(sw8.sw[0]),
-            ims.edge.eq(0),
-            #ims.red.eq(sw8.sw[1]),
-            ims.red.eq(0),
-            #ims.green.eq(sw8.sw[2]),
-            ims.green.eq(0),
-            #ims.blue.eq(sw8.sw[3]),
-            ims.blue.eq(0),
-            #ims.invert.eq(0),
-            ims.invert.eq(0),
-            ims.border.eq(0),
-            #ims.gamma.eq(sw8.sw[6]),
-            ims.gamma.eq(0),
-            #ims.filter.eq(sw8.sw[7]),
-            ims.filter.eq(0),
+            ims.edge.eq(edge),
+            ims.invert.eq(invert),
+            ims.border.eq(border),
+            ims.gamma.eq(gamma),
+            ims.filter.eq(filt),
             ims.mono.eq(mono),
-            ims.bright.eq(1),
             ims.x_flip.eq(xflip),
             ims.y_flip.eq(yflip),
-            ims.val.eq(val)
+            ims.val.eq(val),
+            ims.redness.eq(redness),
+            ims.greenness.eq(greenness),
+            ims.blueness.eq(blueness),
+            ims.brightness.eq(brightness)
         ]
 
         # Frame-level statistics
@@ -287,7 +321,7 @@ class CamTest(Elaboratable):
             y.eq(vga.o_beam_y),
             raddr.eq((y[1:] * 320) + x2[1:]), # 2 cycles to read
             waddr.eq((ims.o_y * 320) + ims.o_x),
-            read_pixel.eq(x[1] & ~y[0]),
+            read_pixel.eq(~vga_blank & x[1] & ~y[0]),
             mem.init.eq(~pll.locked), # Use pll not locked as signal to initialise SDRAM
             mem.sync.eq(~div[2]),      # Sync with 25MHz clock
             mem.address.eq(Mux(read_pixel, raddr, waddr)),

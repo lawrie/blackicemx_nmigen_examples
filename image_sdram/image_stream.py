@@ -21,10 +21,6 @@ class ImageStream(Elaboratable):
         self.edge        = Signal()
         self.x_flip      = Signal()
         self.y_flip     = Signal()
-        self.bright      = Signal()
-        self.red         = Signal()
-        self.green       = Signal()
-        self.blue        = Signal()
         self.mono        = Signal()
         self.invert      = Signal()
         self.threshold   = Signal()
@@ -33,6 +29,10 @@ class ImageStream(Elaboratable):
         self.border      = Signal()
         self.p_x         = Signal(10)
         self.p_y         = Signal(10)
+        self.redness     = Signal(signed(7))
+        self.greenness   = Signal(signed(7))
+        self.blueness    = Signal(signed(7))
+        self.brightness  = Signal(signed(7))
 
     def elaborate(self, platform):
         m = Module()
@@ -189,11 +189,17 @@ class ImageStream(Elaboratable):
         n_r = Signal(signed(6))
         n_g = Signal(signed(7))
         n_b = Signal(signed(6))
+        t_r = Signal(signed(6))
+        t_g = Signal(signed(7))
+        t_b = Signal(signed(6))
 
         m.d.comb += [
-            n_r.eq(g_r + self.val),
-            n_g.eq(g_g + self.val),
-            n_b.eq(g_b + self.val)
+            t_r.eq(g_r + self.redness + self.brightness),
+            t_g.eq(g_g + self.greenness + self.brightness),
+            t_b.eq(g_b + self.blueness + self.brightness),
+            n_r.eq(Mux(t_r > 0x1f, 0x1f, Mux(t_r < 0, 0, t_r))),
+            n_g.eq(Mux(t_g > 0x3f, 0x3f, Mux(t_g < 0, 0, t_g))),
+            n_r.eq(Mux(t_b > 0x1f, 0x1f, Mux(t_b < 0, 0, t_b))),
         ]
 
         # Process pixel when valid set, and set ready
@@ -204,9 +210,9 @@ class ImageStream(Elaboratable):
                 self.o_x.eq(c_x),
                 self.o_y.eq(c_y),
                 # Copy input pixel by default
-                self.o_r.eq(g_r),
-                self.o_g.eq(g_g),
-                self.o_b.eq(g_b),
+                self.o_r.eq(n_r),
+                self.o_g.eq(n_g),
+                self.o_b.eq(n_b),
                 # Write pixel to current line
                 w.addr.eq(cl * self.res_x + c_x),
                 w.data.eq(Cat(self.i_b, self.i_g, self.i_r)),
@@ -229,23 +235,9 @@ class ImageStream(Elaboratable):
                         self.o_g.eq(0),
                         self.o_b.eq(0)
                     ]
-            with m.Else():
-            # Increase colors or total brightness
-                with m.If(self.red | self.bright):
-                    m.d.sync += [
-                        self.o_r.eq(Mux(n_r > 0x1f, 0x1f, Mux(n_r < 0, 0, n_r)))
-                    ]
-                with m.If(self.green | self.bright):
-                    m.d.sync += [
-                        self.o_g.eq(Mux(n_g > 0x3f, 0x3f, Mux(n_g < 0, 0, n_g)))
-                    ]
-                with m.If(self.blue | self.bright):
-                    m.d.sync += [
-                        self.o_b.eq(Mux(n_b > 0x1f, 0x1f, Mux(n_b < 0, 0, n_b)))
-                    ]
 
             # Draw a border
-            with m.If(self.border & ((c_x == 0) | (c_x == self.res_x - 1) | (c_y == 0) | (c_y == self.res_y - 1))):
+            with m.If(self.border & ((c_x < 2) | (c_x >= self.res_x - 2) | (c_y < 2) | (c_y >= self.res_y - 2))):
                 m.d.sync += [
                     self.o_r.eq(0),
                     self.o_g.eq(0),
