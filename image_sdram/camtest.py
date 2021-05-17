@@ -141,11 +141,12 @@ class CamTest(Elaboratable):
         osd_on = Signal(reset=1)
         osd_val = Signal(4, reset=0)
 
-        val = Signal(signed(7), reset=0)
         brightness = Signal(signed(7), reset=0)
         redness = Signal(signed(7), reset=0)
         greenness = Signal(signed(7), reset=0)
         blueness = Signal(signed(7), reset=0)
+        edge_thresh = Signal(signed(7), reset=10)
+        filt_thresh = Signal(signed(7), reset=30)
 
         debdown = Debouncer()
         m.submodules.debdown = debdown
@@ -156,6 +157,7 @@ class CamTest(Elaboratable):
         debsel = Debouncer()
         m.submodules.debsel = debsel
 
+        # Image selection options
         xflip = Signal(reset=0)
         yflip = Signal(reset=1)
         mono = Signal(reset=0)
@@ -204,6 +206,8 @@ class CamTest(Elaboratable):
                         m.d.sync += invert.eq(1)
                     with m.Case(10): # gamma
                         m.d.sync += gamma.eq(1)
+                    with m.Case(11): # filter
+                        m.d.sync += filt.eq(1)
 
         with m.If(debdown.btn_down):
             with m.If(osd_on & ~osd_sel):
@@ -232,6 +236,8 @@ class CamTest(Elaboratable):
                         m.d.sync += invert.eq(0)
                     with m.Case(10): # gamma
                         m.d.sync += gamma.eq(0)
+                    with m.Case(11): # filter
+                        m.d.sync += filt.eq(0)
 
         # Image stream
         max_r = Signal(5)
@@ -256,7 +262,8 @@ class CamTest(Elaboratable):
             ims.mono.eq(mono),
             ims.x_flip.eq(xflip),
             ims.y_flip.eq(yflip),
-            ims.val.eq(val),
+            ims.edge_thresh.eq(edge_thresh),
+            ims.filt_thresh.eq(filt_thresh),
             ims.redness.eq(redness),
             ims.greenness.eq(greenness),
             ims.blueness.eq(blueness),
@@ -364,6 +371,9 @@ class CamTest(Elaboratable):
                 osd_on.eq(~osd_on),
                 osd_sel.eq(0)
             ]
+
+        with m.If(debsel.btn_down & osd_on):
+            m.d.sync += osd_sel.eq(~osd_sel)
             
         m.d.comb += [
             osd.x.eq(x),
@@ -375,7 +385,6 @@ class CamTest(Elaboratable):
             osd.osd_val.eq(osd_val),
             osd.sel.eq(osd_sel)
         ]
-
 
         m.d.comb += [
             vga_out.red.eq(osd.o_r),

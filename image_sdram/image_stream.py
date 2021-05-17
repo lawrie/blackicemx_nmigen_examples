@@ -17,10 +17,11 @@ class ImageStream(Elaboratable):
         self.o_r         = Signal(5)
         self.o_g         = Signal(6)
         self.o_b         = Signal(5)
-        self.val         = Signal(signed(7))
+        self.filt_thresh = Signal(signed(7))
+        self.edge_thresh = Signal(signed(7))
         self.edge        = Signal()
         self.x_flip      = Signal()
-        self.y_flip     = Signal()
+        self.y_flip      = Signal()
         self.mono        = Signal()
         self.invert      = Signal()
         self.threshold   = Signal()
@@ -113,7 +114,7 @@ class ImageStream(Elaboratable):
                 c_b.eq(Mux(self.invert, 0x1f - s[2:], s[2:]))
             ]
         with m.Elif(self.filter):
-            with m.If((self.i_r > self.val)):
+            with m.If((self.i_r > self.filt_thresh)):
                 m.d.comb += [
                     c_r.eq(0x1f),
                     c_g.eq(0),
@@ -146,7 +147,7 @@ class ImageStream(Elaboratable):
                 max_y.eq(0)
             ]
 
-        with m.If(self.i_r > self.val):
+        with m.If(self.i_r > self.filt_thresh):
             with m.If ((min_x == 0) | (c_x < min_x)):
                 m.d.sync += min_x.eq(c_x)
             with m.If((max_x == 0) | (c_x > max_x)):
@@ -223,7 +224,7 @@ class ImageStream(Elaboratable):
 
             # Simple edge detection
             with m.If(self.edge):
-                with m.If(((p_s > s) & ((p_s - s) > self.val)) | ((p_s < s) & ((s - p_s) > self.val))):
+                with m.If(((p_s > s) & ((p_s - s) > self.edge_thresh)) | ((p_s < s) & ((s - p_s) > self.edge_thresh))):
                     m.d.sync += [
                         self.o_r.eq(0x1f),
                         self.o_g.eq(0),
