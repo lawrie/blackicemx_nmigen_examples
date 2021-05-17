@@ -106,7 +106,7 @@ class ImageStream(Elaboratable):
         c_g = Signal(6)
         c_b = Signal(5)
 
-        with m.If(self.mono):
+        with m.If(self.mono | self.invert):
             m.d.comb += [
                 c_r.eq(Mux(self.invert, 0x1f - s[2:], s[2:])),
                 c_g.eq(Mux(self.invert, 0x3f - s[1:], s[1:])),

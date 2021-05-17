@@ -95,7 +95,7 @@ class CamTest(Elaboratable):
         m.d.sdram += div.eq(div+1)
 
         # Power-on reset
-        reset = Signal(16, reset=0)
+        reset = Signal(13, reset=0)
         with m.If(~reset.all()):
             m.d.sdram += reset.eq(reset+1)
 
@@ -159,8 +159,8 @@ class CamTest(Elaboratable):
         redness = Signal(signed(7), reset=0)
         greenness = Signal(signed(7), reset=0)
         blueness = Signal(signed(7), reset=0)
-        edge_thresh = Signal(signed(7), reset=10)
-        filt_thresh = Signal(signed(7), reset=30)
+        edge_thresh = Signal(signed(7), reset=0)
+        filt_thresh = Signal(signed(7), reset=0)
 
         m.d.comb += [
             debup.btn.eq(up),
@@ -194,13 +194,13 @@ class CamTest(Elaboratable):
                     with m.Case(7): # border
                         m.d.sync += border.eq(1)
                     with m.Case(8): # edge detection
-                        m.d.sync += edge.eq(1)
+                        m.d.sync += edge_thresh.eq(edge_thresh+1)
                     with m.Case(9): # invert
                         m.d.sync += invert.eq(1)
                     with m.Case(10): # gamma
                         m.d.sync += gamma.eq(1)
                     with m.Case(11): # filter
-                        m.d.sync += filt.eq(1)
+                        m.d.sync += filt_thresh.eq(filt_thresh+1)
 
         with m.If(debdown.btn_down):
             with m.If(osd_on & ~osd_sel):
@@ -224,13 +224,13 @@ class CamTest(Elaboratable):
                     with m.Case(7): # border
                         m.d.sync += border.eq(0)
                     with m.Case(8): # edge detection
-                        m.d.sync += edge.eq(0)
+                        m.d.sync += edge_thresh.eq(edge_thresh-1)
                     with m.Case(9): # invert
                         m.d.sync += invert.eq(0)
                     with m.Case(10): # gamma
                         m.d.sync += gamma.eq(0)
                     with m.Case(11): # filter
-                        m.d.sync += filt.eq(0)
+                        m.d.sync += filt_thresh.eq(filt_thresh-1)
 
         # Image stream
         max_r = Signal(5)
@@ -247,11 +247,11 @@ class CamTest(Elaboratable):
             ims.i_r.eq(camread.pixel_data[11:]),
             ims.i_g.eq(camread.pixel_data[5:11]),
             ims.i_b.eq(camread.pixel_data[0:5]),
-            ims.edge.eq(edge),
+            ims.edge.eq(edge_thresh != 0),
             ims.invert.eq(invert),
             ims.border.eq(border),
             ims.gamma.eq(gamma),
-            ims.filter.eq(filt),
+            ims.filter.eq(filt_thresh != 0),
             ims.mono.eq(mono),
             ims.x_flip.eq(xflip),
             ims.y_flip.eq(yflip),
