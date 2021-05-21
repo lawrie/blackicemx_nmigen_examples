@@ -45,9 +45,9 @@ class SpiController(Elaboratable):
 
         if self._pins is not None:
             if self.use_csn:
-                m.d.comb += self.pins.cs_n.o.eq(self.cs_n)
-            m.d.comb += self.pins.copi.o.eq(self.copi)
-            m.d.comb += self.pins.clk.o.eq(self.sclk)
+                m.d.comb += self._pins.cs.o.eq(self.csn)
+            m.d.comb += self._pins.copi.o.eq(self.copi)
+            m.d.comb += self._pins.clk.o.eq(self.sclk)
             m.submodules += FFSynchronizer(self._pins.cipo, self.cipo, reset=1)
 
         m.d.sync += [
@@ -55,7 +55,7 @@ class SpiController(Elaboratable):
             self.rdy.eq(1)
         ]
 
-        with m.If(self.req | ~self.rdy):
+        with m.If((self.req & ~self.done) | ~self.rdy):
             m.d.sync += [
                 # Set rdy false when active
                 self.rdy.eq(0),
