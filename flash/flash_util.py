@@ -23,12 +23,16 @@ class Top(Elaboratable):
         m.submodules.serial = serial = AsyncSerial(divisor=divisor, pins=uart)
 
         dc         = Signal(6,  reset=0)
-        cmd        = Signal(32, reset=0x03000000)
+        read_cmd   = Signal(32, reset=0x03000000)
         dat_r      = Signal(8)
-        delay_cnt  = Signal(12,  reset=0)
+        delay_cnt  = Signal(12, reset=0)
         byte_ready = Signal(1,  reset = 0)
         bytes_read = Signal(24, reset=0)
         done       = Signal(1,  reset=0)
+        bytes_rcvd = Signal(24, reset=0)
+        cmd        = Signal(8,  reset=0)
+        length     = Signal(32, reset=0)
+        addr       = Signal(32, reset=0)
 
         # Connect the uart
         m.d.comb += [
@@ -42,6 +46,9 @@ class Top(Elaboratable):
             # Show any errors on leds: red for parity, green for overflow, blue for frame
             leds.eq(Cat(serial.rx.err.frame, done, serial.rx.err.overflow, serial.rx.err.parity))
         ]
+
+        with m.If(serial.rx.rdy):
+            m.d.sync += bytes_rcvd.eq(bytes_rcvd + 1)
 
         with m.FSM() as fsm:
             # Initial delay seems to be necessary before waking flash
@@ -62,15 +69,43 @@ class Top(Elaboratable):
                     m.d.sync += spi_flash.cs.o.eq(0)
                 with m.Elif(dc == 63): # Delay after wake-up
                     m.d.sync += [
-                        dc.eq(31),
-                        spi_flash.cs.o.eq(1)
+                        bytes_rcvd.eq(0)
                     ]
-                    m.next = "TX"
+                    m.next = "WAITING"
+            with m.State("WAITING"):
+                # Read the command from the uart
+                with m.If(serial.rx.rdy):
+                    with m.Switch(bytes_rcvd):
+                        with m.Case(0):
+                            m.d.sync += cmd.eq(serial.rx.data)
+                        with m.Case(1):
+                            m.d.sync += length.eq(serial.rx.data)
+                        with m.Case(2):
+                            m.d.sync += length.eq(Cat(serial.rx.data, length[:24]))
+                        with m.Case(3):
+                            m.d.sync += length.eq(Cat(serial.rx.data, length[:24]))
+                        with m.Case(4):
+                            m.d.sync += length.eq(Cat(serial.rx.data, length[:24]))
+                        with m.Case(5):
+                            m.d.sync += addr.eq(serial.rx.data)
+                        with m.Case(6):
+                            m.d.sync += addr.eq(Cat(serial.rx.data, addr[:24]))
+                        with m.Case(7):
+                            m.d.sync += addr.eq(Cat(serial.rx.data, addr[:24]))
+                        with m.Case(8):
+                            m.d.sync += addr.eq(Cat(serial.rx.data, addr[:24]))
+                with m.If(bytes_rcvd == 9):
+                    m.d.sync += [
+                        dc.eq(31),
+                        spi_flash.cs.o.eq(1),
+                        bytes_rcvd.eq(0)
+                    ]
+                    m.next = "READ"
             # Send a 32-bit command to read from address 0
-            with m.State("TX"):
+            with m.State("READ"):
                 m.d.sync += dc.eq(dc -1)
                 m.d.comb += [
-                    spi_flash.copi.o.eq(cmd >> dc),
+                    spi_flash.copi.o.eq((read_cmd | addr) >> dc),
                     spi_flash.clk.o.eq(~ClockSignal())
                 ]
                 with m.If(dc == 0):
@@ -91,24 +126,23 @@ class Top(Elaboratable):
                         dc.eq(7),
                         delay_cnt.eq(0)
                     ]
-                    m.next = "SHOW"
+                    m.next = "SEND"
             # Show the byte on the led for about a second
-            with m.State("SHOW"):
+            with m.State("SEND"):
                 m.d.sync += delay_cnt.eq(delay_cnt+1)
                 m.d.comb += byte_ready.eq(delay_cnt == 0) # Strobe to say a byte is ready
                 with m.If(delay_cnt == 0):
                     m.d.sync += [
-                        leds8.eq(dat_r),
                         dat_r.eq(0),
                         bytes_read.eq(bytes_read + 1),
+                        leds8.eq(dat_r)
                     ]
-                with m.If(bytes_read == 135100 - 4):
+                with m.If(bytes_read == length):
                     m.next="DONE"
                 with m.If(delay_cnt.all()):
                     m.next = "RX" # Go on to next byte
             with m.State("DONE"):
                 m.d.sync += [
-                    leds8.eq(0),
                     done.eq(1)
                 ]
             
