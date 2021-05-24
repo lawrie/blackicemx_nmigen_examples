@@ -40,9 +40,17 @@ ledglow.py makes all 4 leds glow using PWM.
 
 ### uart
 
-uart.py characters on a uart.
+uart.py echoes characters on a uart.
 
 e.g. do `screen /dev/ttyACM0`
+
+This is based on esden's icebreaker example.
+
+### uart_stdio
+
+This is a version of uart.py that uses the nmigen-stdio Serial class.
+
+uart_test.py echoes characters.
 
 ### audio
 
@@ -164,3 +172,24 @@ This is an SDRAM version of the OV7670 test with a 320x240 frame buffer.
 
 Run camtest.py and press button 1 to configure the camera into RGB mode.
 
+### ov7670_sdram_fifo
+
+This is the start of an LCD image processor that uses a FIFO to avoid contention on the SDRAM when reading pixels from the camera and writing them to the LCD.
+
+### flash
+
+flash_test.py reads the flash memory and displays it on leds one byte at a time, each second.
+
+It needs a Digilent 8-LED Pmod.
+
+flash_util.py is the start of a utility for writing binary files to flash memory, and reading back flash memory to a file.
+
+### textlcd
+
+This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
+
+### spi
+
+This is the start of a configurable spi controller.
+
+I am still working on how best to do the handshaking.
