@@ -4,6 +4,8 @@ from nmigen_stdio.serial import *
 
 from nmigen_boards.blackice_mx import *
 
+from nmigen.lib.fifo import SyncFIFOBuffered
+
 # Optional 8-LED Digilent Pmod for diagnostics
 leds8_1_pmod = [
     Resource("leds8_1", 0,
@@ -48,6 +50,9 @@ class Top(Elaboratable):
         written     = Signal(24, reset=0)
         erased      = Signal(1,  reset=0)
 
+        # Create fifo from bytes received from uart
+        m.submodules.fifo = fifo = SyncFIFOBuffered(width=8,depth=256)
+
         # Connect the uart
         m.d.comb += [
             # Connect data out to data in
@@ -55,13 +60,16 @@ class Top(Elaboratable):
             # Write data from flash memory
             byte_ready.eq(0),
             serial.tx.ack.eq(byte_ready),
-            leds8.eq(rem[:8]),
+            # Write to the FIFO when a byte received from uart
+            fifo.w_en.eq(serial.rx.rdy),
+            fifo.w_data.eq(serial.rx.data),
+            leds8.eq(fifo.r_level),
             # Show any errors on leds: red for parity, green for overflow, blue for frame
             leds.eq(Cat(erased, done, serial.rx.err.overflow, serial.rx.err.parity))
         ]
 
-        # Tally the bytes received from the uart
-        with m.If(serial.rx.rdy):
+        # Tally the bytes received from the uart via the fifo
+        with m.If(fifo.r_en & fifo.r_rdy):
             m.d.sync += bytes_rcvd.eq(bytes_rcvd + 1)
 
         # Main state machine
@@ -88,33 +96,37 @@ class Top(Elaboratable):
                     m.d.sync += spi_flash.cs.o.eq(0)
                 with m.Elif(dc == 63): # Delay after wake-up
                     m.d.sync += [
-                        bytes_rcvd.eq(0)
+                        bytes_rcvd.eq(0),
+                        # Read from the uart fifo
+                        fifo.r_en.eq(1),
                     ]
                     m.next = "WAITING"
             with m.State("WAITING"):
-                # Read the command from the uart
-                with m.If(serial.rx.rdy):
+                # Read the command from the uart fifo
+                with m.If(fifo.r_rdy):
                     with m.Switch(bytes_rcvd):
                         with m.Case(0):
-                            m.d.sync += cmd.eq(serial.rx.data)
+                            m.d.sync += cmd.eq(fifo.r_data)
                         with m.Case(1):
-                            m.d.sync += length.eq(serial.rx.data)
+                            m.d.sync += length.eq(fifo.r_data)
                         with m.Case(2):
-                            m.d.sync += length.eq(Cat(serial.rx.data, length[:24]))
+                            m.d.sync += length.eq(Cat(fifo.r_data, length))
                         with m.Case(3):
-                            m.d.sync += length.eq(Cat(serial.rx.data, length[:24]))
+                            m.d.sync += length.eq(Cat(fifo.r_data, length))
                         with m.Case(4):
-                            m.d.sync += addr.eq(serial.rx.data)
+                            m.d.sync += addr.eq(fifo.r_data)
                         with m.Case(5):
-                            m.d.sync += addr.eq(Cat(serial.rx.data, addr[:24]))
+                            m.d.sync += addr.eq(Cat(fifo.r_data, addr))
                         with m.Case(6):
-                            m.d.sync += addr.eq(Cat(serial.rx.data, addr[:24]))
+                            m.d.sync += addr.eq(Cat(fifo.r_data, addr))
                 with m.If(bytes_rcvd == 7):
                     with m.If(cmd == 0): # READ
                         m.d.sync += [
                             dc.eq(31),
                             spi_flash.cs.o.eq(1),
-                            bytes_rcvd.eq(0)
+                            bytes_rcvd.eq(0),
+                            # Stop reading from uart fifo
+                            fifo.r_en.eq(0)
                         ]
                         m.next = "READ"
                     with m.Elif(cmd == 1): # WRITE
@@ -123,8 +135,8 @@ class Top(Elaboratable):
                             spi_flash.cs.o.eq(1),
                             rem.eq(length),
                             written.eq(0),
-                            # Stop reading from uart
-                            serial.rx.ack.eq(0)
+                            # stop reading from uart fifo
+                            fifo.r_en.eq(0)
                         ]
                         m.next = "WE1"
             # Send a 32-bit command to read from requested address
@@ -254,20 +266,20 @@ class Top(Elaboratable):
                 ]
                 with m.If(dc == 0):
                     m.d.sync += [
-                        # Allow reading from uart
-                        serial.rx.ack.eq(1)
+                        # Read from uart fifo
+                        fifo.r_en.eq(1)
                     ]
                     m.next = "GET_BYTE"
             with m.State("GET_BYTE"):
-                with m.If(serial.rx.rdy):
+                with m.If(fifo.r_rdy):
                     m.d.sync += [
-                        # Echo character
-                        dat_r.eq(serial.rx.data),
-                        # Disable receives from uart again
-                        serial.rx.ack.eq(0),
+                        # Get character from uart fifo
+                        dat_r.eq(fifo.r_data),
+                        # Stop receives from uart fifo again
+                        fifo.r_en.eq(0),
                         dc.eq(7)
                     ]
-                    m.d.comb += byte_ready.eq(1)
+                    #m.d.comb += byte_ready.eq(1) # This echoes to the uart for diagnostics
                     m.next = "TX"
             with m.State("TX"):
                 m.d.sync += [
@@ -292,8 +304,8 @@ class Top(Elaboratable):
                         m.next = "WAIT_WRITE"
                     with m.Else():
                         m.d.sync += [
-                            # Allow reading from uart
-                            serial.rx.ack.eq(1)
+                            # Read from uart fifo
+                            fifo.r_en.eq(1),
                         ]
                         m.next = "GET_BYTE"
             with m.State("WAIT_WRITE"):
