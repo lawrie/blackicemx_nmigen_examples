@@ -1,15 +1,18 @@
-# nmigen examples for Blackice MX
+# nMigen examples for Blackice MX
 
 ## Introduction
 
-These are examples for the Blackice MX ice40 FPGA, written in the python-based nmigen HDL.
+These are examples for the Blackice MX ice40 FPGA, written in the python-based nMigen HDL.
+
+See the [nMigen Language guide](https://nmigen.info/nmigen/latest/install.html) for how to install nMigen.
 
 You will need to install a version of [nmigen-boards](https://github.com/folknology/nmigen-boards) with Blackice MX support.
 
 To run the blinky example on Linux, plug in your Blackice MX board and do:
 
 ```sh
-stty -F /dev/ttyACM0 raw
+export DEVICE=/dev/ttyACM0
+stty -F $DEVICE raw
 cd blinky
 python3 blinky.py
 ```
@@ -17,8 +20,6 @@ python3 blinky.py
 You will need nextpnr-ice40 on your path.
 
 The other examples are run in a siimilar way.
-
-You may need to edit icecore.py in nmigen-boards to set the default value for the port parameter in toolchain_program to the value used by your system, for example /dev/ttyACM0.
 
 Some of the examples support simulation as well as running on the board.
 
@@ -28,29 +29,178 @@ The examples have been ported from a variety of sources.
 
 ### blinky
 
-blinky.py blinks the blue led.
+blinky.py blinks the blue led. It demonstrsates how to synthesise a simple nMigen module on the B;ackIce MX board.
+
+```python
+from nmigen import *
+from nmigen_boards.blackice_mx import *
+
+class Blinky(Elaboratable):
+    def elaborate(self, platform):
+        led   = platform.request("led", 0)
+        timer = Signal(24)
+
+        m = Module()
+        m.d.sync += timer.eq(timer + 1)
+        m.d.comb += led.o.eq(timer[-1])
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.build(Blinky(), do_program=True)
+```
 
 ### leds
 
-leds.py count on the 4 leds.
+Runmning leds.py counts on the 4 leds. It uses a timer that wraps round into about every second, and sets the 4 leds to the most significant bits of the timer.
+You can adjust the width of the timer to set the speed.
+
+```python
+from nmigen import *
+from nmigen_boards.blackice_mx import *
+
+class Leds(Elaboratable):
+    def elaborate(self, platform):
+        leds  = Cat([platform.request("led", i) for i in range(4)])
+        timer = Signal(26)
+
+        m = Module()
+        m.d.sync += timer.eq(timer + 1)
+        m.d.comb += leds.eq(timer[-5:-1])
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.build(Leds(), do_program=True)
+```
 
 leds16.py counts on 2 digilent 8-LED Pmods, connected on pmods 2 and 3.
 
+This example shows how to define resources connected to Pmods.
+
+```python
+from nmigen import *
+from nmigen.build import *
+from nmigen_boards.blackice_mx import *
+
+leds8_1_pmod = [
+    Resource("leds8_1", 0,
+            Subsignal("leds", Pins("7 8 9 10 1 2 3 4", dir="o", conn=("pmod",2)), Attrs(IO_STANDARD="SB_LVCMOS")))
+]
+
+leds8_2_pmod = [
+    Resource("leds8_2", 0,
+            Subsignal("leds", Pins("7 8 9 10 1 2 3 4", dir="o", conn=("pmod",3)), Attrs(IO_STANDARD="SB_LVCMOS")))
+]
+
+class Leds(Elaboratable):
+    def elaborate(self, platform):
+        leds8_1 = Cat([l for l in platform.request("leds8_1")])
+        leds8_2 = Cat([l for l in platform.request("leds8_2")])
+        leds16 =  Cat(leds8_1, leds8_2)
+        timer = Signal(38)
+
+        m = Module()
+        m.d.sync += timer.eq(timer + 1)
+        m.d.comb += leds16.eq(timer[-17:-1])
+        return m
+
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.add_resources(leds8_1_pmod)
+    platform.add_resources(leds8_2_pmod)
+    platform.build(Leds(), do_program=True)
+```
+
 ledglow.py makes all 4 leds glow using PWM.
+
+```
+from nmigen import *
+from nmigen_boards.blackice_mx import *
+
+class LedGlow(Elaboratable):
+    def elaborate(self, platform):
+        led = [platform.request("led", i) for i in range(4)]
+        cnt = Signal(26)
+        pwm_input = Signal(4)
+        pwm = Signal(5)
+
+        m = Module()
+
+        m.d.sync += [
+            cnt.eq(cnt + 1),
+            pwm.eq(pwm[:-1] + pwm_input)
+        ]
+
+        with m.If(cnt[-1]):
+            m.d.sync += pwm_input.eq(cnt[-5:])
+        with m.Else():
+            m.d.sync += pwm_input.eq(~cnt[-5:])
+
+        for l in led:
+            m.d.comb += l.eq(pwm[-1])
+
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.build(LedGlow(), do_program=True)
+```
+
+### buttons and debouncing
+
+Debounces buttons.
+
+debounce.py counts up on the other 3 leds, when you press button 1, corresponding to the blue led.
 
 ### uart
 
 uart.py echoes characters on a uart.
 
-e.g. do `screen /dev/ttyACM0`
+You can do `screen $DEVICE` after uploading the bitstream, and type in characters, or use any other serial terminal program.
 
-This is based on esden's icebreaker example.
+This is based on [esden's iCEBreaker example](https://github.com/icebreaker-fpga/icebreaker-nmigen-examples/tree/master/uart) and demonstreate simulation techniques.
 
 ### uart_stdio
 
-This is a version of uart.py that uses the nmigen-stdio Serial class.
+uart_test.py uses the nmigen-stdio Serial class to echo characters.
 
-uart_test.py echoes characters.
+```
+from nmigen import *
+from nmigen_stdio.serial import *
+
+from nmigen_boards.blackice_mx import *
+
+class UartTest(Elaboratable):
+    def elaborate(self, platform):
+
+        uart    = platform.request("uart")
+        leds    = Cat([platform.request("led", i) for i in range(4)])
+        divisor = int(platform.default_clk_frequency // 115200)
+
+        m = Module()
+
+        # Create the uart
+        m.submodules.serial = serial = AsyncSerial(divisor=divisor, pins=uart)
+
+        m.d.comb += [
+            # Connect data out to data in
+            serial.tx.data.eq(serial.rx.data),
+            # Always allow reads
+            serial.rx.ack.eq(1),
+            # Write data when received
+            serial.tx.ack.eq(serial.rx.rdy),
+            # Show any errors on leds: red for parity, green for overflow, blue for frame
+            leds.eq(Cat(serial.rx.err.frame, serial.rx.err.overflow, 0b0, serial.rx.err.parity))
+        ]
+
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.build(UartTest(), do_program=True)
+```
 
 ### audio
 
@@ -68,11 +218,6 @@ music3.py plays a scale.
 
 music4.py plays a tune.
 
-### debounce
-
-Debounces buttons.
-
-debounce.py counts up on the other 3 leds, when you press button 2, corresponding to the blue led.
 
 ### ps2_keyboard
 
