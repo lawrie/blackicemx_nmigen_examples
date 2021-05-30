@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
 ### leds
 
-Runmning leds.py counts on the 4 leds. It uses a timer that wraps round into about every second, and sets the 4 leds to the most significant bits of the timer.
+Running leds.py counts on the 4 leds. It uses a timer that wraps round into about every second, and sets the 4 leds to the most significant bits of the timer.
 You can adjust the width of the timer to set the speed.
 
 ```python
