@@ -123,10 +123,10 @@ class MiteCPU(Elaboratable):
                     m.next = "EXECUTE"
             with m.State("EXECUTE"):
                 # Delay execution for led diagnostics
-                m.d.sync += dc.eq(dc + 1)
                 with m.If(control.reset):
                     m.next = "RESET"
                 with m.Elif(~control.halt):
+                    m.d.sync += dc.eq(dc + 1)
                     with m.If(dc.all()):
                         # Advance instruction pointer
                         m.d.sync += [
