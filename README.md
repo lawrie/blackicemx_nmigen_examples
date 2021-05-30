@@ -200,7 +200,7 @@ The test program, debounce.py counts up on the other 3 leds, when you press butt
 from nmigen import *
 from nmigen_boards.blackice_mx import *
 
-from debouncer import *
+from debouncer import Debouncer
 
 class Debounce(Elaboratable):
     def elaborate(self, platform):
@@ -209,8 +209,7 @@ class Debounce(Elaboratable):
 
         m = Module()
 
-        debouncer = Debouncer()
-        m.submodules.debouncer = debouncer
+        m.submodules.debouncer = debouncer = Debouncer()
 
         m.d.comb += debouncer.btn.eq(btn1)
 
@@ -218,7 +217,6 @@ class Debounce(Elaboratable):
             m.d.sync += leds.eq(leds+1)
 
         return m
-
 
 if __name__ == "__main__":
     platform = BlackIceMXPlatform()
@@ -345,6 +343,10 @@ Test of a 3.3v HC-SR04 ultrasonic (ping) sensor.
 
 Run ping_test.py and press button to take a measurement.
 
+### textlcd
+
+This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
+
 ### mitecpu
 
 This is a [tiny 8-bit cpu](https://github.com/jbush001/MiteCPU) with a python assembler.
@@ -398,10 +400,6 @@ flash_test.py reads the flash memory and displays it on leds one byte at a time,
 It needs a Digilent 8-LED Pmod.
 
 flash_util.py is the start of a utility for writing binary files to flash memory, and reading back flash memory to a file.
-
-### textlcd
-
-This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
 
 ### spi
 
