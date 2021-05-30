@@ -3,7 +3,7 @@ from nmigen_boards.blackice_mx import *
 
 class LedGlow(Elaboratable):
     def elaborate(self, platform):
-        led   = [platform.request("led", i) for i in range(4)]
+        led = [platform.request("led", i) for i in range(4)]
         cnt = Signal(26)
         pwm_input = Signal(4)
         pwm = Signal(5)
@@ -12,7 +12,7 @@ class LedGlow(Elaboratable):
 
         m.d.sync += [
             cnt.eq(cnt + 1),
-            pwm.eq(pwm[0:-1] + pwm_input)
+            pwm.eq(pwm[:-1] + pwm_input)
         ]
 
         with m.If(cnt[-1]):
@@ -28,3 +28,4 @@ class LedGlow(Elaboratable):
 if __name__ == "__main__":
     platform = BlackIceMXPlatform()
     platform.build(LedGlow(), do_program=True)
+
