@@ -148,11 +148,94 @@ if __name__ == "__main__":
     platform.build(LedGlow(), do_program=True)
 ```
 
-### buttons and debouncing
+### debounce
 
 Debounces buttons.
 
-debounce.py counts up on the other 3 leds, when you press button 1, corresponding to the blue led.
+The Debouncer is based on the one from fpga4fun.com.
+
+```python
+from nmigen import *
+
+class Debouncer(Elaboratable):
+    def __init__(self):
+        self.btn       = Signal()
+        self.btn_state = Signal(reset=0)
+        self.btn_down  = Signal()
+        self.btn_up    = Signal()
+
+    def elaborate(self, platform):
+        cnt      = Signal(15, reset=0)
+        btn_sync = Signal(2,  reset=0)
+        idle     = Signal()
+        cnt_max  = Signal()
+
+        m = Module()
+
+        m.d.comb += [
+            idle.eq(self.btn_state == btn_sync[1]),
+            cnt_max.eq(cnt.all()),
+            self.btn_down.eq(~idle & cnt_max & ~self.btn_state),
+            self.btn_up.eq(~idle & cnt_max & self.btn_state)
+        ]
+
+        m.d.sync += [
+            btn_sync[0].eq(~self.btn),
+            btn_sync[1].eq(btn_sync[0])
+        ]
+
+        with m.If(idle):
+            m.d.sync += cnt.eq(0)
+        with m.Else():
+            m.d.sync += cnt.eq(cnt + 1);
+            with m.If (cnt_max):
+                m.d.sync += self.btn_state.eq(~self.btn_state)
+
+        return m
+```
+
+The test program, debounce.py counts up on the other 3 leds, when you press button 1, corresponding to the blue led.
+
+```python
+from nmigen import *
+from nmigen_boards.blackice_mx import *
+
+from debouncer import *
+
+class Debounce(Elaboratable):
+    def elaborate(self, platform):
+        leds  = Cat([platform.request("led", i) for i in range(1,4)])
+        btn1 = platform.request("button", 0)
+
+        m = Module()
+
+        debouncer = Debouncer()
+        m.submodules.debouncer = debouncer
+
+        m.d.comb += debouncer.btn.eq(btn1)
+
+        with m.If(debouncer.btn_up):
+            m.d.sync += leds.eq(leds+1)
+
+        return m
+
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.build(Debounce(), do_program=True)
+```
+
+### seven_segment
+
+This needs a Digilent 7-segment Pmod in the top row of pmod2 and pmod3 (the side opposite the usb connectors).
+
+Run seven_test.py to run it on the board or seven_seg_sim.py for a nice simulation.
+
+### seven_mixmod
+
+This needs a nystorm 7-segment Mixmod connected on mixmod 1.
+
+Run seven_test.py.
 
 ### uart
 
@@ -218,12 +301,49 @@ music3.py plays a scale.
 
 music4.py plays a tune.
 
-
 ### ps2_keyboard
 
 This needs a Digilent PS/2 keyboard Pmod connected to the bottom row of pmod5.
 
-When you press a key on the keyboard the scan codes are written in hex to the uart, so run `cat /dev/ttyACM0`.
+When you press a key on the keyboard the scan codes are written in hex to the uart, so run `cat $DEVICE`.
+
+### rotary_encoder
+
+This needs a quadrature rotary encoder connected to pins 21 and 22.
+
+Run rotary_encoder.py and see the leds change when yor turn the knob.
+
+### vga
+
+This needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
+
+Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
+
+### oled
+
+This needs a 7-pin spi ssd1331 oled display and a Pmod or other means to connect it to pmod5.
+
+Run top_oled_vga.py to put a pattern on the display.
+
+### st7789
+
+This needs a 7-pin spi st7789 display and a Pmod or other means to connect it to pmod5.
+
+The st7789 is a 240x240 color display, as opposed to the 96x64 resolution of the sdd1331, but the prices are similar.
+
+Run st7789_test.py to get a pattern on the display.
+
+### ws2812
+
+Test of ws2812b leds (neopixels).
+
+Run ws2812_test.py to test it with a 16-led neopixel ring.
+
+### ping
+
+Test of a 3.3v HC-SR04 ultrasonic (ping) sensor.
+
+Run ping_test.py and press button to take a measurement.
 
 ### mitecpu
 
@@ -241,44 +361,6 @@ Assemble programs with opc6asm.py and run them with opc6_sim.py of opc_test.py.
 
 This is just the cpu,m without any connected ram or uart, so it doesn't do much.
 
-### rotary_encoder
-
-This needs a quadrature rotary encoder connected to pins 21 and 22.
-
-Run rotary_encoder.py and see the leds change when yor turn the knob.
-
-### seven_segment
-
-This needs a Digilent 7-segment Pmod in the top row of pmod2 and pmod3 (the side opposite the usb connectors).
-
-Run seven_test.py to run it on the board or seven_seg_sim.py for a nice simulation.
-
-### seven_mixmod
-
-This needs a nystorm 7-segment Mixmod connected on mixmod 1.
-
-Run seven_test.py.
-
-### oled
-
-This needs a 7-pin spi ssd1331 oled display and a Pmod or other means to connect it to pmod5.
-
-Run top_oled_vga.py to put a pattern on the display.
-
-### st7789
-
-This needs a 7-pin spi st7789 display and a Pmod or other means to connect it to pmod5.
-
-The st7789 is a 240x240 color display, as opposed to the 96x64 resolution of the sdd1331, but the prices are similar.
-
-Run st7789_test.py to get a pattern on the display.
-
-### vga
-
-This needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
-
-Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
-
 ### sdram
 
 This is an 8-bit dual port SDRAM controller.
@@ -290,18 +372,6 @@ Run test_sdram.py to test it.
 This is a 16-bit single port SDRAM controller.
 
 Run test_sdram16.py to see the results on the leds: green means passed, red failed.
-
-### ws2812
-
-Test of ws2812b leds (neopixels).
-
-Run ws2812_test.py to test it with a 16-led neopixel ring.
-
-### ping
-
-Test of a 3.3v HC-SR04 ultrasonic (ping) sensor.
-
-Run ping_test.py and press button to take a measurement.
 
 ### ov7670
 
@@ -338,3 +408,12 @@ This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
 This is the start of a configurable spi controller.
 
 I am still working on how best to do the handshaking.
+
+### wishbone
+
+mitecpu.py is a version of the MiteCPU, converted to access memory via a Wishbone bus. It uses two point-to-point wishbone buses, for code and data.
+
+### wishbone_lambda
+
+This version of mitecpu.py is a more extensive wishbone bus example, using components from lambdasoc.
+
