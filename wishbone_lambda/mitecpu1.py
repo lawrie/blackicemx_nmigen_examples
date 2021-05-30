@@ -21,23 +21,16 @@ leds8_2_pmod = [
 # Tiny CPU converted from Verilog - https://github.com/jbush001/MiteCPU
 class MiteCPU(Elaboratable):
     def __init__(self):
-        # Arbiter not yet used, as there is a single master
-        self._arbiter = wishbone.Arbiter(addr_width=9, data_width=16, granularity=16)
-        # Address decoder to select slave
-        self._decoder = wishbone.Decoder(addr_width=9, data_width=16, granularity=16, features={"cti", "bte"})
+        self._arbiter = wishbone.Arbiter(addr_width=11, data_width=16, granularity=16)
+        self._decoder = wishbone.Decoder(addr_width=11, data_width=16, granularity=16, features={"cti", "bte"})
 
-        # Add code and data memory slaves to the decoder
         self.code = SRAMPeripheral(size=256, data_width=16, granularity=16, writable=False)
         self.data = SRAMPeripheral(size=256, data_width=16)
 
         self._decoder.add(self.code.bus, addr=0x0000)
         self._decoder.add(self.data.bus, addr=0x0100)
 
-        # Create the master bus interface
-        self._bus = wishbone.Interface(addr_width=9, data_width=16, granularity=16)
-
     def elaborate(self, platform):
-        # Led output and diagnostics
         leds    = Cat([platform.request("led", i) for i in range(4)])
         leds8_1 = Cat([i for i in platform.request("leds8_1")])
         leds8_2 = Cat([i for i in platform.request("leds8_2")])
@@ -47,64 +40,57 @@ class MiteCPU(Elaboratable):
         print(" ".join(hex(n) for n in prog))
 
         # Registers and other signals
-        ip          = Signal(8,  reset=0xff) # Instruction pointer
-        ip_nxt      = Signal(8)              # Next instruction pointer
-        instr       = Signal(11)             # Current instruction
-        acc         = Signal(8,  reset=0)    # Accumulator
-        index       = Signal(8,  reset=0)    # Index register
-        op          = Signal(8)              # The data operand
-        addr        = Signal(8)              # The data address
-        dc          = Signal(22)
+        ip     = Signal(8,  reset=0xff) # Instruction pointer
+        ip_nxt = Signal(8)              # Next instruction pointer
+        instr  = Signal(11)             # Current instruction
+        acc    = Signal(8,  reset=0)    # Accumulator
+        index  = Signal(8,  reset=0)    # Index register
+        op     = Signal(8)              # The data operand
+        addr   = Signal(8)              # The data address
+        dc     = Signal(22)
 
         m = Module()
 
-        # Add code and data wishbone peripheral modules
+        # Code and data wishbone peripherals
         m.submodules.code = code = self.code
         m.submodules.data = data = self.data
 
-        # Add decoder and arbiter modules
-        m.submodules.decoder = decoder = self._decoder
-        m.submodules.arbiter = arbiter = self._arbiter
+        # Decoder and arbiter
+        #m.submodules.decoder = self._decoder
+        m.submodules.arbiter = self._arbiter
 
         # Initialise the rom with code
         code.init = prog
 
-        # Connect the master bus to the decoder
-        bus = self._bus
+        # Connect memory and calculate data address and next instruction pointer
         m.d.comb += [
-            bus.connect(decoder.bus)
-        ]
-
-        # Calculate data address next instruction pointer
-        m.d.comb += [
+            code.bus.adr.eq(ip),
+            code.bus.cti.eq(wishbone.CycleType.CLASSIC),
+            data.bus.dat_w.eq(acc),
+            data.bus.adr.eq(addr),
+            data.bus.sel.eq(1),
             addr.eq(instr[:8] + index),
             ip_nxt.eq(Mux((instr[8:] == 4) & acc[7], instr[:8], ip + 1)),
             leds8_1.eq(ip),
-            leds8_2.eq(addr[1:])
+            leds8_2.eq(instr[8:])
         ]
 
         # Execution state machine
         with m.FSM() as fsm:
             with m.State("FETCH"):
-                with m.If(bus.ack):
-                    m.d.sync += [
-                        instr.eq(bus.dat_r),
-                        bus.adr.eq(Cat(addr, 0b1))
-                    ]
+                with m.If(code.bus.ack):
+                    m.d.sync += instr.eq(code.bus.dat_r)
                     m.next = "DATA"
             with m.State("DATA"):
-                with m.If(bus.ack):
-                    m.d.sync += op.eq(bus.dat_r)
+                with m.If(data.bus.ack):
+                    m.d.sync += op.eq(data.bus.dat_r)
                     m.next = "EXECUTE"
             with m.State("EXECUTE"):
                 # Delay execution for led diagnostics
                 m.d.sync += dc.eq(dc + 1)
                 with m.If(dc.all()):
                     # Advance instruction pointer
-                    m.d.sync += [
-                        ip.eq(ip_nxt),
-                        bus.adr.eq(ip_nxt)
-                    ]
+                    m.d.sync += ip.eq(ip_nxt)
             
                     # Decode and execute current instruction
                     m.d.sync += index.eq(0) # index defaults to zero
@@ -127,11 +113,11 @@ class MiteCPU(Elaboratable):
 
         # Set requests for code and data on appropriate cycles
         m.d.comb += [
-            bus.cyc.eq(fsm.ongoing("FETCH") | fsm.ongoing("DATA")),
-            bus.stb.eq(bus.cyc),
-            bus.dat_w.eq(acc),
-            bus.sel.eq(1),
-            bus.we.eq(instr[8:] == 0b011)
+            code.bus.cyc.eq(fsm.ongoing("FETCH")),
+            code.bus.stb.eq(code.bus.cyc),
+            data.bus.cyc.eq(fsm.ongoing("DATA")),
+            data.bus.stb.eq(data.bus.cyc),
+            data.bus.we.eq(instr[8:] == 0b011)
         ]
 
         return m
