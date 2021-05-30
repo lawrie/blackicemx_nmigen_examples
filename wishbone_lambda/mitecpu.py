@@ -4,8 +4,8 @@ from nmigen_boards.blackice_mx import *
 
 from nmigen_soc import wishbone
 from lambdasoc.periph.sram import SRAMPeripheral
-#from sram import SRAMPeripheral
 
+from uartbridge import UARTBridge
 from readhex import readhex
 
 leds8_1_pmod = [
@@ -21,9 +21,9 @@ leds8_2_pmod = [
 # Tiny CPU converted from Verilog - https://github.com/jbush001/MiteCPU
 class MiteCPU(Elaboratable):
     def __init__(self):
-        # Arbiter not yet used, as there is a single master
+        # Arbiter for the two bus masters (cpu and bridge)
         self._arbiter = wishbone.Arbiter(addr_width=9, data_width=16, granularity=16)
-        # Address decoder to select slave
+        # Address decoder to select slave (code or data)
         self._decoder = wishbone.Decoder(addr_width=9, data_width=16, granularity=16, features={"cti", "bte"})
 
         # Add code and data memory slaves to the decoder
@@ -62,25 +62,35 @@ class MiteCPU(Elaboratable):
         m.submodules.code = code = self.code
         m.submodules.data = data = self.data
 
+        # Initialise the rom with code
+        code.init = prog
+
         # Add decoder and arbiter modules
         m.submodules.decoder = decoder = self._decoder
         m.submodules.arbiter = arbiter = self._arbiter
 
-        # Initialise the rom with code
-        code.init = prog
+        # Create uart bridge for wishbone tool
+        uart_pins = platform.request("uart", 0)
+        uart_divisor = int(platform.default_clk_frequency // 115200)
+        m.submodules.bridge = bridge = UARTBridge(divisor=uart_divisor, pins=uart_pins)
 
-        # Connect the master bus to the decoder
+        # Connect the master and bridge buses to arbiter, and arbiter to decoder
         bus = self._bus
+        self._arbiter.add(bridge.bus)
+        self._arbiter.add(bus)
+
         m.d.comb += [
-            bus.connect(decoder.bus)
+            arbiter.bus.connect(decoder.bus)
         ]
 
+        # Start of CPU code
         # Calculate data address next instruction pointer
         m.d.comb += [
             addr.eq(instr[:8] + index),
             ip_nxt.eq(Mux((instr[8:] == 4) & acc[7], instr[:8], ip + 1)),
+            # Diagnostics
             leds8_1.eq(ip),
-            leds8_2.eq(addr[1:])
+            leds8_2.eq(op)
         ]
 
         # Execution state machine
@@ -131,7 +141,7 @@ class MiteCPU(Elaboratable):
             bus.stb.eq(bus.cyc),
             bus.dat_w.eq(acc),
             bus.sel.eq(1),
-            bus.we.eq(instr[8:] == 0b011)
+            bus.we.eq(instr[8:] == 0b011) # Write if STO instruction, else read
         ]
 
         return m
