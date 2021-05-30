@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
 ledglow.py makes all 4 leds glow using PWM.
 
-```
+```python
 from nmigen import *
 from nmigen_boards.blackice_mx import *
 
