@@ -7,6 +7,7 @@ from lambdasoc.periph.sram import SRAMPeripheral
 
 from uartbridge import UARTBridge
 from readhex import readhex
+from control import ControlPeripheral
 
 leds8_1_pmod = [
     Resource("leds8_1", 0,
@@ -22,9 +23,9 @@ leds8_2_pmod = [
 class MiteCPU(Elaboratable):
     def __init__(self):
         # Arbiter for the two bus masters (cpu and bridge)
-        self._arbiter = wishbone.Arbiter(addr_width=9, data_width=16, granularity=16)
+        self._arbiter = wishbone.Arbiter(addr_width=10, data_width=16, granularity=16)
         # Address decoder to select slave (code or data)
-        self._decoder = wishbone.Decoder(addr_width=9, data_width=16, granularity=16, features={"cti", "bte"})
+        self._decoder = wishbone.Decoder(addr_width=10, data_width=16, granularity=16, features={"cti", "bte"})
 
         # Add code and data memory slaves to the decoder
         self.code = SRAMPeripheral(size=256, data_width=16, granularity=16, writable=False)
@@ -33,8 +34,13 @@ class MiteCPU(Elaboratable):
         self._decoder.add(self.code.bus, addr=0x0000)
         self._decoder.add(self.data.bus, addr=0x0100)
 
+        # Create the control peripheral
+        self.control = ControlPeripheral(data_width=16, granularity=16)
+
+        self._decoder.add(self.control.bus, addr=0x0200)
+
         # Create the master bus interface
-        self._bus = wishbone.Interface(addr_width=9, data_width=16, granularity=16)
+        self._bus = wishbone.Interface(addr_width=10, data_width=16, granularity=16)
 
     def elaborate(self, platform):
         # Led output and diagnostics
@@ -64,6 +70,9 @@ class MiteCPU(Elaboratable):
 
         # Initialise the rom with code
         code.init = prog
+
+        # Add control peripheral
+        m.submodules.control = control = self.control
 
         # Add decoder and arbiter modules
         m.submodules.decoder = decoder = self._decoder
@@ -95,6 +104,12 @@ class MiteCPU(Elaboratable):
 
         # Execution state machine
         with m.FSM() as fsm:
+            with m.State("RESET"):
+                m.d.sync += [
+                    ip.eq(0xff)
+                ]
+                with m.If(~control.reset):
+                    m.next = "FETCH"
             with m.State("FETCH"):
                 with m.If(bus.ack):
                     m.d.sync += [
@@ -109,31 +124,34 @@ class MiteCPU(Elaboratable):
             with m.State("EXECUTE"):
                 # Delay execution for led diagnostics
                 m.d.sync += dc.eq(dc + 1)
-                with m.If(dc.all()):
-                    # Advance instruction pointer
-                    m.d.sync += [
-                        ip.eq(ip_nxt),
-                        bus.adr.eq(ip_nxt)
-                    ]
+                with m.If(control.reset):
+                    m.next = "RESET"
+                with m.Elif(~control.halt):
+                    with m.If(dc.all()):
+                        # Advance instruction pointer
+                        m.d.sync += [
+                            ip.eq(ip_nxt),
+                            bus.adr.eq(ip_nxt)
+                        ]
             
-                    # Decode and execute current instruction
-                    m.d.sync += index.eq(0) # index defaults to zero
-                    with m.Switch(instr[8:]):
-                        with m.Case("000"):
-                            m.d.sync += acc.eq(acc + op)
-                        with m.Case("001"):
-                            m.d.sync += acc.eq(acc - op)
-                        with m.Case("110"):
-                            m.d.sync += acc.eq(acc & op)
-                        with m.Case("010"):
-                            m.d.sync += acc.eq(instr[:8])
-                        with m.Case("101"):
-                            m.d.sync += index.eq(op)
-                        with m.Case("011"):
-                            # data[0] is leds
-                            with m.If(instr[:8] == 0):
-                                m.d.sync += leds.eq(acc)
-                    m.next = "FETCH"
+                        # Decode and execute current instruction
+                        m.d.sync += index.eq(0) # index defaults to zero
+                        with m.Switch(instr[8:]):
+                            with m.Case("000"):
+                                m.d.sync += acc.eq(acc + op)
+                            with m.Case("001"):
+                                m.d.sync += acc.eq(acc - op)
+                            with m.Case("110"):
+                                m.d.sync += acc.eq(acc & op)
+                            with m.Case("010"):
+                                m.d.sync += acc.eq(instr[:8])
+                            with m.Case("101"):
+                                m.d.sync += index.eq(op)
+                            with m.Case("011"):
+                                # data[0] is leds
+                                with m.If(instr[:8] == 0):
+                                    m.d.sync += leds.eq(acc)
+                        m.next = "FETCH"
 
         # Set requests for code and data on appropriate cycles
         m.d.comb += [

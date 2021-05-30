@@ -13,7 +13,7 @@ class UARTBridge(Elaboratable):
         if bus is not None:
             self.bus = bus
         else:
-            self.bus = wishbone.Interface(addr_width=9,
+            self.bus = wishbone.Interface(addr_width=10,
                                       data_width=16, granularity=16)
         self._pins = pins
         self._divisor = divisor
