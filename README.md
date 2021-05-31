@@ -957,9 +957,14 @@ This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
 
 This is a [tiny 8-bit cpu](https://github.com/jbush001/MiteCPU) with a python assembler.
 
-The least significant bits of the accumulator are mapped to the cpu.
+The least significant bits of the accumulator are mapped to the leds, so programs can flash the leds.
 
 Assemble programs with assemble.py and run them with mitecpu.py.
+
+The CPU has a Harvard architecture with a maximum of 256 instructions, and 256 8-bit data items. Instructions are 11 bits.
+Instructions execute in 2 clock cycles, or one clock cycle if the negative edge triggers data accesses. Instructions have a 3-bit opcode and an 8 bit operand, which is usually a memory address. There are just 7 opcodes. There are three 8-bit registers: ip (instructon pointer), acc (accumulator) and index (index register).
+
+MiteCPU is used as a wishbone master in the wishbone examples below.
 
 ### opc
 
