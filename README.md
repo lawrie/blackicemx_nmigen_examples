@@ -972,7 +972,7 @@ This is an nmigen version of the [opc6](https://revaldinho.github.io/opc/) 16-bi
 
 Assemble programs with opc6asm.py and run them with opc6_sim.py of opc_test.py.
 
-This is just the cpu,m without any connected ram or uart, so it doesn't do much.
+This is just the cpu, without any connected ram or uart, so it doesn't do much.
 
 ### sdram
 
