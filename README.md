@@ -501,6 +501,12 @@ music3.py plays a scale.
 
 music4.py plays a tune.
 
+### servo
+
+This example drives a servo motor. It needs the [Digilent Servo Pmod](https://store.digilentinc.com/pmod-con3-r-c-servo-connectors/).
+
+Run servo_test.py.
+
 ### ps2_keyboard
 
 This needs a Digilent PS/2 keyboard Pmod connected to the bottom row of pmod5.
