@@ -352,19 +352,62 @@ if __name__ == "__main__":
 
 ### seven_mixmod
 
-This needs a nystorm 7-segment Mixmod connected on mixmod 1.
+This needs a Mystorm 7-segment Mixmod connected on mixmod 1.
 
-Run seven_test.py.
+Both seven_seg.py and seven_seg_sim.py are the same as for the Digilent Pmod, but the Mixmod has 3 digits, and a different mapping to pins, so seven_test.py is changed:
+
+```python
+from nmigen import *
+from nmigen.build import *
+from nmigen_boards.blackice_mx import *
+from seven_seg import SevenSegController
+
+seven_seg_mixmod = [
+    Resource("seven_seg", 0,
+            Subsignal("a",  Pins("27", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("b",  Pins("28", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("c",  Pins("26", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("d",  Pins("25", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("e",  Pins("10", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("f",  Pins("13", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("g",  Pins("12", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("dp", Pins("11", invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("ca", Pins("4 19 18",  invert=True, dir="o", conn=("mixmod",1)), Attrs(IO_STANDARD="SB_LVCMOS")))
+]
+
+class SevenTest(Elaboratable):
+    def elaborate(self, platform):
+        # Get pins
+        seg_pins = platform.request("seven_seg")
+        leds7 = Cat([seg_pins.a, seg_pins.b, seg_pins.c, seg_pins.d,
+                     seg_pins.e, seg_pins.f, seg_pins.g])
+
+        # Add 7-segment controller
+        m = Module()
+        m.submodules.seven = seven = SevenSegController()
+
+        # Timer
+        timer = Signal(40)
+        m.d.sync += timer.eq(timer + 1)
+
+
+        # Connect pins
+        m.d.comb += [
+            leds7.eq(seven.leds)
+        ]
+
+        # Set pins for each digit to appropriate slice of time to count up in hex
+        for i in range(3):
+            # Each digit refreshed at at least 100Hz
+            m.d.comb += seg_pins.ca[i].eq(timer[17:19] == i)
+
+            with m.If(seg_pins.ca[i]):
+                m.d.comb += seven.val.eq(timer[((i - 3) * 4) - 5:((i - 3) * 4) - 1])
+
+        return m
+```
 
 ### uart
-
-uart.py echoes characters on a uart.
-
-You can do `screen $DEVICE` after uploading the bitstream, and type in characters, or use any other serial terminal program.
-
-This is based on [esden's iCEBreaker example](https://github.com/icebreaker-fpga/icebreaker-nmigen-examples/tree/master/uart) and demonstreate simulation techniques.
-
-### uart_stdio
 
 uart_test.py uses the nmigen-stdio Serial class to echo characters.
 
@@ -406,9 +449,9 @@ if __name__ == "__main__":
 
 ### audio
 
-These are audio examples from fpga4fun.com.
+These are audio examples from [fpga4fun.com](https://www.fpga4fun.com/MusicBox.html).
 
-They are set up for Digilent Amp2 Pmod in the bottom row of pmod 5 (next to the usb connector), but you can just connect a speaker or earphones to pin 19.
+They are set up for [Digilent Amp2 Pmod](https://store.digilentinc.com/pmod-amp2-audio-amplifier/) in the bottom row of pmod 5 (next to the usb connector), but you can just connect a speaker or earphones to pin 19.
 
 music1.py plays middle C.
 
