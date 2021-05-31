@@ -593,7 +593,7 @@ if __name__ == "__main__":
     platform = BlackIceMXPlatform()
     platform.add_resources(audio_pmod)
     platform.build(Music2a(), do_program=True)
-```                                                                                            1,1           Top
+```
 
 music3.py plays a scale.
 
