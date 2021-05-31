@@ -7,7 +7,7 @@ from readint import *
 
 audio_pmod= [
     Resource("audio", 0,
-            Subsignal("l", Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("ain",       Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
             Subsignal("shutdown", Pins("4", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
@@ -17,7 +17,6 @@ class Music4(Elaboratable):
 
         m = Module()
 
-        left = audio.l
         led = [platform.request("led", i) for i in range(4)]
         leds = Cat([i.o for i in led])
 
@@ -54,7 +53,7 @@ class Music4(Elaboratable):
             m.d.sync += counter_note.eq(clkdivider)
             with m.If(counter_octave == 0):
                 with m.If((fullnote != 0) & (tone[28] == 0)): 
-                    m.d.sync += left.eq(15-left)
+                    m.d.sync += audio.ain.eq(~audio.ain)
                 m.d.sync += counter_octave.eq(255 >> octave)
             with m.Else():
                 m.d.sync += counter_octave.eq(counter_octave - 1)
@@ -63,8 +62,8 @@ class Music4(Elaboratable):
 
         return m
 
-
 if __name__ == "__main__":
     platform = BlackIceMXPlatform()
     platform.add_resources(audio_pmod)
     platform.build(Music4(), do_program=True)
+

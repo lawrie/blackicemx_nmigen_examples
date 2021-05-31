@@ -4,7 +4,7 @@ from nmigen_boards.blackice_mx import *
 
 audio_pmod= [
     Resource("audio", 0,
-            Subsignal("l", Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("ain",      Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
             Subsignal("shutdown", Pins("4", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
@@ -14,7 +14,6 @@ class Music2a(Elaboratable):
 
         m = Module()
 
-        left = audio.l
         counter = Signal(15)
         clkdivider = Signal(15)
         tone = Signal(28)
@@ -42,7 +41,7 @@ class Music2a(Elaboratable):
         
         with m.If(counter == 0):
             m.d.sync += [
-                left.eq(15 - left),
+                audio.ain.eq(~audio.ain),
                 counter.eq(clkdivider)
             ]
         with m.Else():
@@ -50,8 +49,8 @@ class Music2a(Elaboratable):
           
         return m
 
-
 if __name__ == "__main__":
     platform = BlackIceMXPlatform()
     platform.add_resources(audio_pmod)
     platform.build(Music2a(), do_program=True)
+

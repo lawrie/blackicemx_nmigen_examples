@@ -6,7 +6,7 @@ from divideby12 import *
 
 audio_pmod= [
     Resource("audio", 0,
-            Subsignal("l", Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("ain",      Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
             Subsignal("shutdown", Pins("4", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
@@ -16,7 +16,6 @@ class Music3(Elaboratable):
 
         m = Module()
 
-        left = audio.l
         notes = [512,483,456,431,406,384,362,342,323,304,287,271]
         notemem = Memory(width=9, depth=16, init=map(lambda x: x -1, notes))
 
@@ -46,7 +45,7 @@ class Music3(Elaboratable):
         with m.If(counter_note == 0):
             m.d.sync += counter_note.eq(clkdivider)
             with m.If(counter_octave == 0):
-                m.d.sync += left.eq(15-left)
+                m.d.sync += audio.ain.eq(~audio.ain)
                 with m.If(octave == 0):
                     m.d.sync += counter_octave.eq(255)
                 with m.Elif(octave == 1):
@@ -66,8 +65,8 @@ class Music3(Elaboratable):
 
         return m
 
-
 if __name__ == "__main__":
     platform = BlackIceMXPlatform()
     platform.add_resources(audio_pmod)
     platform.build(Music3(), do_program=True)
+
