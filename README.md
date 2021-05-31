@@ -748,7 +748,90 @@ if __name__ == "__main__":
 
 This example drives a servo motor. It needs the [Digilent Servo Pmod](https://store.digilentinc.com/pmod-con3-r-c-servo-connectors/).
 
-Run servo_test.py.
+servo.py is the Servo controller:
+
+```python
+from nmigen import *
+
+from nmigen.utils import bits_for
+
+class Servo(Elaboratable):
+    def __init__(self):
+        # inputs
+        self.on        = Signal()
+        self.angle     = Signal(signed(8))
+
+        # output
+        self.out       = Signal()
+
+    def elaborate(self, platform):
+
+        clk_freq          = int(platform.default_clk_frequency)
+        cycles_per_pulse  = int(clk_freq // 50) # 20ms
+        cnt_bits          = bits_for(cycles_per_pulse)
+        cycles_per_degree = C(int((cycles_per_pulse // 40) // 90), cnt_bits)
+        zero_point        = C(int((cycles_per_pulse // 40) * 3), cnt_bits) # 1.5ms
+        print("cycles per pulse:", cycles_per_pulse)
+        print("cycles per degree:", cycles_per_degree)
+        print("zero point:", zero_point)
+
+        cnt = Signal(cnt_bits, reset=0)
+
+        m = Module()
+
+        with m.If(self.on):
+            m.d.sync += cnt.eq(cnt + 1)
+            with m.If(cnt == (cycles_per_pulse - 1)):
+                m.d.sync += [
+                    cnt.eq(0),
+                    self.out.eq(1)
+                ]
+            with m.Elif(cnt == (zero_point + (self.angle * cycles_per_degree))):
+                m.d.sync += self.out.eq(0)
+        with m.Else():
+            m.d.sync += self.out.eq(0)
+
+        return m
+```
+
+Run servo_test.py for a very simple test:
+
+```python
+from nmigen import *
+from nmigen.build import *
+from nmigen_boards.blackice_mx import *
+
+from servo import Servo
+
+servo_pmod= [
+    Resource("servo", 0,
+            Subsignal("p1", Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("p2", Pins("2", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("p3", Pins("3", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("p4", Pins("4", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
+]
+
+class Top(Elaboratable):
+    def elaborate(self, platform):
+        servo_pins = platform.request("servo")
+
+        m = Module()
+
+        m.submodules.servo = servo = Servo()
+
+        m.d.comb += [
+            servo.on.eq(1),
+            servo_pins.p1.eq(servo.out),
+            servo.angle.eq(120)
+        ]
+
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.add_resources(servo_pmod)
+    platform.build(Top(), do_program=True)
+```
 
 ### ps2_keyboard
 
