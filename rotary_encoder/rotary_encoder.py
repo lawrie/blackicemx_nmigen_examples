@@ -4,7 +4,7 @@ import argparse
 
 from nmigen import *
 from nmigen.build import *
-from nmigen.back import pysim
+from nmigen.sim import Simulator
 from nmigen_boards.blackice_mx import *
 
 rotary_encoder_pmod = [
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     if args.s:
         iq_to_step_dir = IQToStepDir()
-        sim = pysim.Simulator(iq_to_step_dir)
+        sim = Simulator(iq_to_step_dir)
         sim.add_clock(1.0 / 12e6)
 
         def out_proc():
