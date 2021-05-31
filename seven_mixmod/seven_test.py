@@ -18,25 +18,32 @@ seven_seg_mixmod = [
 
 class SevenTest(Elaboratable):
     def elaborate(self, platform):
-        led = [platform.request("led", i) for i in range(4)]
+        # Get pins
         seg_pins = platform.request("seven_seg")
+        leds7 = Cat([seg_pins.a, seg_pins.b, seg_pins.c, seg_pins.d,
+                     seg_pins.e, seg_pins.f, seg_pins.g])
 
-        timer = Signal(29)
-        seven = SevenSegController()
-
+        # Add 7-segment controller
         m = Module()
-        m.submodules.seven = seven
+        m.submodules.seven = seven = SevenSegController()
+
+        # Timer
+        timer = Signal(40)
         m.d.sync += timer.eq(timer + 1)
+
+
+        # Connect pins
         m.d.comb += [
-            Cat([i.o for i in led]).eq(timer[-9:-1]),
-            Cat([seg_pins.a, seg_pins.b, seg_pins.c, seg_pins.d,
-                 seg_pins.e, seg_pins.f, seg_pins.g]).eq(seven.leds),
+            leds7.eq(seven.leds)
         ]
              
+        # Set pins for each digit to appropriate slice of time to count up in hex
         for i in range(3):
-            m.d.comb += seg_pins.ca[i].eq(timer[-3:-1] == i)
+            # Each digit refreshed at at least 100Hz
+            m.d.comb += seg_pins.ca[i].eq(timer[17:19] == i)
 
-        m.d.comb += seven.val.eq(timer[-7:-3])
+            with m.If(seg_pins.ca[i]):
+                m.d.comb += seven.val.eq(timer[((i - 3) * 4) - 5:((i - 3) * 4) - 1])
 
         return m
 
