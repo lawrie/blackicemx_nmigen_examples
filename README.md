@@ -453,7 +453,45 @@ These are audio examples from [fpga4fun.com](https://www.fpga4fun.com/MusicBox.h
 
 They are set up for [Digilent Amp2 Pmod](https://store.digilentinc.com/pmod-amp2-audio-amplifier/) in the bottom row of pmod 5 (next to the usb connector), but you can just connect a speaker or earphones to pin 19.
 
-music1.py plays middle C.
+music1.py plays middle C:
+
+```python
+from nmigen import *
+from nmigen.build import *
+from nmigen_boards.blackice_mx import *
+
+audio_pmod= [
+    Resource("audio", 0,
+            Subsignal("ain",      Pins("1", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("shutdown", Pins("4", dir="o", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
+]
+
+class Music1(Elaboratable):
+    def elaborate(self, platform):
+        audio  = platform.request("audio")
+
+        m = Module()
+
+        clkdivider = int(platform.default_clk_frequency / 440 / 2)
+        counter = Signal(clkdivider.bit_length())
+
+        m.d.comb += audio.shutdown.eq(1)
+
+        with m.If(counter == 0):
+           m.d.sync += [
+               counter.eq(clkdivider - 1),
+               audio.ain.eq(~audio.ain)
+           ]
+        with m.Else():
+           m.d.sync += counter.eq(counter - 1)
+
+        return m
+
+if __name__ == "__main__":
+    platform = BlackIceMXPlatform()
+    platform.add_resources(audio_pmod)
+    platform.build(Music1(), do_program=True)
+```
 
 music2.py plays 2 tones alternating.
 
