@@ -3,7 +3,7 @@ import argparse
 from ctypes import ArgumentError
 from nmigen import *
 from nmigen.build import *
-from nmigen.back import pysim
+from nmigen.sim import *
 from nmigen_boards.blackice_mx import *
 
 
@@ -325,14 +325,14 @@ class _LoopbackTest(Elaboratable):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s", action="store_true", help="Simulate Rotary Encoder (for debugging).")
+    parser.add_argument("-s", action="store_true", help="Simulate uart.")
     args = parser.parse_args()
 
     if args.s:
         pads = _TestPads()
 
         dut = UART(pads, clk_freq=4800, baud_rate=1200)
-        sim = pysim.Simulator(dut)
+        sim = Simulator(dut)
         sim.add_clock(1.0 / 12e6)
 
         sim.add_sync_process(_test(pads.tx, pads.rx, dut))
