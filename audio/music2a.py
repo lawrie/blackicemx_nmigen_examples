@@ -38,7 +38,6 @@ class Music2a(Elaboratable):
         with m.Else():
             m.d.comb += clkdivider.eq(Cat([Const(0,6),fastsweep,Const(1,2)]))
 
-        
         with m.If(counter == 0):
             m.d.sync += [
                 audio.ain.eq(~audio.ain),
