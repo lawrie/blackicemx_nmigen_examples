@@ -613,6 +613,16 @@ I am still working on how best to do the handshaking.
 
 mitecpu.py is a version of the MiteCPU, converted to access memory via a Wishbone bus. It uses two point-to-point wishbone buses, for code and data.
 
+### uartbridge
+
+blackice_wb.py runs a uart to wishbone bridge (uartbridge.py), to allow [wishbone-tool](https://github.com/litex-hub/wishbone-utils) to read and write FPGA memory, remotely over uart.
+
+Install wishbone-tool and run blackice_wb.py, and you can then run commands such as:
+
+```sh
+wishbone-util --serial $DEVICE 0x4000 0x12345678
+```
+
 ### wishbone_lambda
 
 This version of mitecpu.py is a more extensive wishbone bus example, using components from lambdasoc.
