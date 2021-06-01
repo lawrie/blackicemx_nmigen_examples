@@ -911,17 +911,123 @@ class PS2(Elaboratable):
 
 When you press a key on the keyboard the scan codes are written in hex to the uart, so run `cat $DEVICE`.
 
+### vga
+
+This nMigen VGA implementation is based on the DVI implementation on the Ulx3s board by [Guztech](https://github.com/GuzTech/ulx3s-nmigen-examples/tree/master/dvi).
+
+It needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
+
+VGA timing for various resolutions are in vga_timings.py:
+
+```python
+from typing import NamedTuple
+
+
+class VGATiming(NamedTuple):
+    x: int
+    y: int
+    refresh_rate: float
+    pixel_freq: int
+    h_front_porch: int
+    h_sync_pulse: int
+    h_back_porch: int
+    v_front_porch: int
+    v_sync_pulse: int
+    v_back_porch: int
+
+vga_timings = {
+
+...
+
+    '1024x768@60Hz': VGATiming(
+        x             = 1024,
+        y             = 768,
+        refresh_rate  = 60.0,
+        pixel_freq    = 65_000_000,
+        h_front_porch = 24,
+        h_sync_pulse  = 136,
+        h_back_porch  = 160,
+        v_front_porch = 3,
+        v_sync_pulse  = 6,
+        v_back_porch  = 29),
+
+...
+
+}
+```
+
+Just one of the timimgs it shown, there are many others in the file including the zstandard vga 640x480@60Hz.
+
+The vga implementation is in vga.py, and its interface is:
+
+```python
+class VGA(Elaboratable):
+    def __init__(self,
+                 resolution_x      = 640,
+                 hsync_front_porch = 16,
+                 hsync_pulse       = 96,
+                 hsync_back_porch  = 48, #44,
+                 resolution_y      = 480,
+                 vsync_front_porch = 10,
+                 vsync_pulse       = 2,
+                 vsync_back_porch  = 33, #31,
+                 bits_x            = 10, # should fit resolution_x + hsync_front_porch + hsync_pulse + hsync_back_porch
+                 bits_y            = 10, # should fit resolution_y + vsync_front_porch + vsync_pulse + vsync_back_porch
+                 dbl_x             = False,
+                 dbl_y             = False):
+        self.i_clk_en       = Signal()
+        self.i_test_picture = Signal()
+        self.i_r            = Signal(8)
+        self.i_g            = Signal(8)
+        self.i_b            = Signal(8)
+        self.o_fetch_next   = Signal()
+        self.o_beam_x       = Signal(bits_x)
+        self.o_beam_y       = Signal(bits_y)
+        self.o_vga_r        = Signal(8)
+        self.o_vga_g        = Signal(8)
+        self.o_vga_b        = Signal(8)
+        self.o_vga_hsync    = Signal()
+        self.o_vga_vsync    = Signal()
+        self.o_vga_vblank   = Signal()
+        self.o_vga_blank    = Signal()
+        self.o_vga_de       = Signal()
+        # Configuration
+        self.resolution_x     = resolution_x
+        self.hsync_front_port = hsync_front_porch
+        self.hsync_pulse      = hsync_pulse
+        self.hsync_back_porch = hsync_back_porch
+        self.resolution_y     = resolution_y
+        self.vsync_front_port = vsync_front_porch
+        self.vsync_pulse      = vsync_pulse
+        self.vsync_back_porch = vsync_back_porch
+        self.bits_x           = bits_x
+        self.bits_y           = bits_y
+```
+
+To run the pixel clock at the speed specified by the timings, a PLL is needed. In top_vgatest.py, the PLL is set up:
+
+```python
+            # Clock generator.
+            m.domains.sync = cd_sync = ClockDomain("sync")
+            m.d.comb += ClockSignal().eq(clk_in)
+
+            m.submodules.pll = pll = PLL(freq_in_mhz=int(platform.default_clk_frequency / 1000000), freq_out_mhz=int(pixel_f / 1000000), domain_name="pixel")
+
+            m.domains.pixel = cd_pixel = pll.domain
+            m.d.comb += pll.clk_pin.eq(clk_in)
+
+            #platform.add_clock_constraint(cd_sync.clk, platform.default_clk_frequency)
+            platform.add_clock_constraint(cd_pixel.clk, pixel_f)
+```
+
+Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
+
 ### rotary_encoder
 
 This needs a quadrature rotary encoder connected to pins 21 and 22.
 
 Run rotary_encoder.py and see the leds change when yor turn the knob.
 
-### vga
-
-This needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
-
-Run top_vgatest.py to see a pattern on the screen. By default 1024x768@60Hz mode is used.
 
 ### oled
 
