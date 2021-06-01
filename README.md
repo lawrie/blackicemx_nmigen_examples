@@ -844,6 +844,12 @@ if __name__ == "__main__":
 
 This needs a Digilent PS/2 keyboard Pmod connected to the bottom row of pmod5.
 
+The PS/2 protocol is a very simple one, using tow pins: a clock and and a data pin. In this example, the pins are input-only (keyboard to host), but the PS/2 protocol does allow host to device output for simple configuration of the device, such as setting leds.
+
+An 8-bit scan code is read in a frame of 1o bits: a start bit, 8 data bits, and parity.
+
+Information on PS/2 scan codes can be found [here](https://techdocs.altium.com/display/FPGA/PS2+Keyboard+Scan+Codes).
+
 This is the PS/2 keyboard controller, ps2.v:
 
 ```python
