@@ -917,7 +917,7 @@ This nMigen VGA implementation is based on the DVI implementation on the Ulx3s b
 
 It needs the Digilent VGA Pmod in pmods 2 and 3, opposite the usb connectors.
 
-VGA timing for various resolutions are in vga_timings.py:
+VGA timings for various resolutions are in vga_timings.py:
 
 ```python
 from typing import NamedTuple
@@ -956,7 +956,7 @@ vga_timings = {
 }
 ```
 
-Just one of the timimgs it shown, there are many others in the file including the zstandard vga 640x480@60Hz.
+Just one of the timings is shown; there are many others in the file including the standard vga 640x480@60Hz.
 
 The vga implementation is in vga.py, and its interface is:
 
