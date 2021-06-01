@@ -753,6 +753,8 @@ if __name__ == "__main__":
 
 This example drives a servo motor. It needs the [Digilent Servo Pmod](https://store.digilentinc.com/pmod-con3-r-c-servo-connectors/).
 
+Servo motors are controlled by specifying a required angle for the spindle to be held at. The angle is determined by a pulse on a single digit output: the length of the pulse specifies the angle. Pulses must be sent at least 50 times a second (every 20 milliseconds) to maintain the output. A zero value usually corresponds to a pulse of 1.5 milliseconds, with a 90 degree change of angle (plus or minus) to 0.5 milliseconds, so a 1 ms pulse means -90 degrees and 2 ms means +90 degrees. But the exact values for a specific mtor need to be calibtated.
+
 servo.py is the Servo controller:
 
 ```python
