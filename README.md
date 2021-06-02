@@ -1100,6 +1100,14 @@ This needs a quadrature rotary encoder connected to pins 21 and 22.
 
 Run rotary_encoder.py and see the leds change when yor turn the knob.
 
+### pong
+
+This is based on the fpga4fun pong example.
+
+It uses a Digilent VGA Pmod and a rotary encoder.
+
+Run pong.py to play a very poor version of Pong.
+
 
 ### oled
 
