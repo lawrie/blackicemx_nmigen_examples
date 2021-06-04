@@ -1108,7 +1108,6 @@ It uses a Digilent VGA Pmod and a rotary encoder.
 
 Run pong.py to play a very poor version of Pong.
 
-
 ### oled
 
 This needs a 7-pin spi ssd1331 oled display and a Pmod or other means to connect it to pmod5.
@@ -1139,6 +1138,32 @@ Run ping_test.py and press button to take a measurement.
 
 This is a start of an example to drive a Hitachi HD44780 2-line text LCD.
 
+### flash
+
+flash_test.py reads the flash memory and displays it on leds one byte at a time, each second.
+
+It needs a Digilent 8-LED Pmod.
+
+flash_util.py is the start of a utility for writing binary files to flash memory, and reading back flash memory to a file.
+
+### spi
+
+This is the start of a configurable spi controller.
+
+I am still working on how best to do the handshaking.
+
+### sdram
+
+This is an 8-bit dual port SDRAM controller.
+
+Run test_sdram.py to test it.
+
+### sdram16
+
+This is a 16-bit single port SDRAM controller.
+
+Run test_sdram16.py to see the results on the leds: green means passed, red failed.
+
 ### mitecpu
 
 This is a [tiny 8-bit cpu](https://github.com/jbush001/MiteCPU) with a python assembler.
@@ -1160,18 +1185,6 @@ Assemble programs with opc6asm.py and run them with opc6_sim.py of opc_test.py.
 
 This is just the cpu, without any connected ram or uart, so it doesn't do much.
 
-### sdram
-
-This is an 8-bit dual port SDRAM controller.
-
-Run test_sdram.py to test it.
-
-### sdram16
-
-This is a 16-bit single port SDRAM controller.
-
-Run test_sdram16.py to see the results on the leds: green means passed, red failed.
-
 ### ov7670
 
 ![ov7670](https://github.com/lawrie/lawrie.github.io/blob/master/images/mx_ov7670.jpg)
@@ -1189,20 +1202,6 @@ Run camtest.py and press button 1 to configure the camera into RGB mode.
 ### ov7670_sdram_fifo
 
 This is the start of an LCD image processor that uses a FIFO to avoid contention on the SDRAM when reading pixels from the camera and writing them to the LCD.
-
-### flash
-
-flash_test.py reads the flash memory and displays it on leds one byte at a time, each second.
-
-It needs a Digilent 8-LED Pmod.
-
-flash_util.py is the start of a utility for writing binary files to flash memory, and reading back flash memory to a file.
-
-### spi
-
-This is the start of a configurable spi controller.
-
-I am still working on how best to do the handshaking.
 
 ### wishbone
 
