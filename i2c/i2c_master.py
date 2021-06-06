@@ -2,6 +2,9 @@ from nmigen import *
 from nmigen.utils import bits_for
 
 class I2cMaster(Elaboratable):
+    AW = 7 # i2c address width
+    DW = 8 # data width
+
     def __init__(self):
         # inputs
         self.valid     = Signal()         # Strobe to start new transaction
@@ -9,14 +12,14 @@ class I2cMaster(Elaboratable):
         self.rep_read  = Signal()         # Set for repeated reads (not tested)
         self.read_only = Signal()         # Set for reads without write cycle
         self.short_wr  = Signal()         # Set for short write
-        self.addr      = Signal(7)        # The 7-bit i2c address
-        self.reg       = Signal(8)        # The register of sub-address
-        self.din       = Signal(8)        # First data byte
-        self.din2      = Signal(8)        # Second data byte
+        self.addr      = Signal(self.AW)  # The 7-bit i2c address
+        self.reg       = Signal(self.DW)  # The register of sub-address
+        self.din       = Signal(self.DW)  # First data byte
+        self.din2      = Signal(self.DW)  # Second data byte
 
         # outputs
         self.rdy       = Signal()         # Set when not busy
-        self.dout      = Signal(8)        # The data read
+        self.dout      = Signal(self.DW)  # The data read
         self.init      = Signal(reset=1)  # Set during initialsation
         self.addr_nack = Signal()         # Low if address is acked
         self.data_nack = Signal()         # Low if data is acked
@@ -126,8 +129,8 @@ class I2cMaster(Elaboratable):
         bit_count         = Signal(6)
         scl_startup_count = Signal(4)
         wr_cyc            = Signal()
-        shift_reg         = Signal(36)
-        read_data         = Signal(8)
+        shift_reg         = Signal(self.AW + self.DW * 3 + 5)
+        read_data         = Signal(self.DW)
 
         # State machine
         with m.Switch(state):
@@ -189,9 +192,9 @@ class I2cMaster(Elaboratable):
                 with m.If(~sda):
                     with m.If(self.read):
                         with m.If(wr_cyc):
-                            m.d.sync += shift_reg.eq(Cat([C(0,17), self.rep_read, C(1,1), self.reg, C(1,0), C(0,0), self.addr]))
+                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 1), self.rep_read, C(1,1), self.reg, C(1,0), C(0,0), self.addr]))
                         with m.Else():
-                            m.d.sync += shift_reg.eq(Cat([C(0,18), C(0,1), C(0xff,8),C(1,1),C(1,1),self.addr]))
+                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 2), C(0,1), C(0xff,self.DW),C(1,1),C(1,1),self.addr]))
                     with m.Else():
                         m.d.sync += shift_reg.eq(Cat([C(1,1), self.din2, C(1,1), self.din, C(1,1), self.reg, C(1,1), C(0,1), self.addr]))
                     m.d.sync += bit_count.eq(0)
@@ -213,15 +216,15 @@ class I2cMaster(Elaboratable):
                 m.d.sync += scl_dir.eq(0)
                 with m.If(scl):
                     m.d.sync += bit_count.eq(bit_count + 1)
-                    with m.If(bit_count == 8):
+                    with m.If(bit_count == self.AW + 1):
                         m.d.sync += self.addr_nack.eq(sda)
-                    with m.Elif(((bit_count == 17) & wr_cyc) | (bit_count == 26) | (bit_count == 35)):
+                    with m.Elif(((bit_count == self.AW + self.DW + 2) & wr_cyc) | (bit_count == self.AW + self.DW * 2 + 3) | (bit_count == self.AW + self.DW * 3 + 4)):
                         m.d.sync += self.data_nack.eq(sda)
-                    with m.If(((bit_count == 18) & self.read) | (bit_count == 36) | (self.short_wr & (bit_count == 27))):
+                    with m.If(((bit_count == self.AW + self.DW + 3) & self.read) | (bit_count == self.AW + self.DW * 3 + 5) | (self.short_wr & (bit_count == self.AW + self.DW * 2 + 4))):
                         delay(T_SU_STO, STOP)
                     with m.Else():
-                        with m.If(bit_count != 17):
-                            m.d.sync += read_data.eq(Cat(sda,read_data[:7]))
+                        with m.If(bit_count != self.AW + self.DW + 2):
+                            m.d.sync += read_data.eq(Cat(sda,read_data[:self.DW-1]))
                         delay(T_HIGH, CLOCK_LOW)
             # Stop bit
             with m.Case(STOP):
