@@ -4,22 +4,23 @@ from nmigen.utils import bits_for
 class I2cMaster(Elaboratable):
     def __init__(self):
         # inputs
-        self.valid     = Signal()
-        self.read      = Signal()
-        self.rep_read  = Signal()
-        self.short_wr  = Signal()
-        self.addr      = Signal(7)
-        self.reg       = Signal(8)
-        self.din       = Signal(8)
-        self.din2      = Signal(8)
+        self.valid     = Signal()         # Strobe to start new transaction
+        self.read      = Signal()         # Set for reads
+        self.rep_read  = Signal()         # Set for repeated reads (not tested)
+        self.read_only = Signal()         # Set for reads without write cycle
+        self.short_wr  = Signal()         # Set for short write
+        self.addr      = Signal(7)        # The 7-bit i2c address
+        self.reg       = Signal(8)        # The register of sub-address
+        self.din       = Signal(8)        # First data byte
+        self.din2      = Signal(8)        # Second data byte
 
         # outputs
-        self.rdy       = Signal()
-        self.dout      = Signal(8)
-        self.init      = Signal(reset=1)
-        self.addr_nack = Signal()
-        self.data_nack = Signal()
-        self.diag      = Signal(8)
+        self.rdy       = Signal()         # Set when not busy
+        self.dout      = Signal(8)        # The data read
+        self.init      = Signal(reset=1)  # Set during initialsation
+        self.addr_nack = Signal()         # Low if address is acked
+        self.data_nack = Signal()         # Low if data is acked
+        self.diag      = Signal(8)        # Diagnostic output
 
     def elaborate(self, platform):
         # Get i2c pins in direct mode
@@ -57,6 +58,7 @@ class I2cMaster(Elaboratable):
 
         m.submodules += sda_io
 
+        # Data is driven low when pins are in output mode
         m.d.comb += [
             scl_out.eq(~scl_dir),
             sda_out.eq(~sda_dir)
@@ -97,11 +99,20 @@ class I2cMaster(Elaboratable):
         state     = Signal(4, reset=PRE_START_UP)
         rtn_state = Signal(4)
 
+        # Function to delay and then go to next state
+        def delay(t, s):
+            m.d.sync += [
+                timer.eq(t),
+                rtn_state.eq(s),
+                state.eq(SPIN)
+            ]
+
+        # Diagnostics
         m.d.comb += self.diag.eq(Cat(state, rtn_state))
 
         # i2c timings
         FREQ       = int(platform.default_clk_frequency // 1000000)
-        #FREQ       = 22
+        #FREQ       = 22 # This gets closer to 100KHz
         T_HD_STA   = 4 * FREQ
         T_LOW      = 5 * FREQ
         T_HIGH     = 5 * FREQ
@@ -155,6 +166,7 @@ class I2cMaster(Elaboratable):
                         m.d.sync += state.eq(IDLE)
                 with m.Else():
                     m.d.sync += timer.eq(timer - 1)
+            # Ready to accept transactions
             with m.Case(IDLE):
                 m.d.sync += [
                     sda_dir.eq(0),
@@ -164,10 +176,11 @@ class I2cMaster(Elaboratable):
                 ]
                 with m.If(self.valid):
                     m.d.sync += [
-                    self.rdy.eq(0),
-                    state.eq(START),
-                    wr_cyc.eq(1)
-                ]
+                        self.rdy.eq(0),
+                        state.eq(START),
+                        wr_cyc.eq(~self.read_only)
+                    ]
+            # Start a transaction and set up the shift register
             with m.Case(START):
                 m.d.sync += [
                     sda_dir.eq(1),
@@ -181,28 +194,21 @@ class I2cMaster(Elaboratable):
                             m.d.sync += shift_reg.eq(Cat([C(0,18), C(0,1), C(0xff,8),C(1,1),C(1,1),self.addr]))
                     with m.Else():
                         m.d.sync += shift_reg.eq(Cat([C(1,1), self.din2, C(1,1), self.din, C(1,1), self.reg, C(1,1), C(0,1), self.addr]))
-                    m.d.sync += [
-                        bit_count.eq(0),
-                        timer.eq(T_HD_STA),
-                        rtn_state.eq(CLOCK_LOW),
-                        state.eq(SPIN)
-                    ]
+                    m.d.sync += bit_count.eq(0)
+                    delay(T_HD_STA, CLOCK_LOW)
+            # Set SCL low
             with m.Case(CLOCK_LOW):
                 m.d.sync += scl_dir.eq(1)
                 with m.If(~scl):
-                    m.d.sync += [
-                        timer.eq(T_HOLD),
-                        rtn_state.eq(SHIFT_DATA),
-                        state.eq(SPIN)
-                    ]
+                    delay(T_HOLD, SHIFT_DATA)
+            # Shift the data out
             with m.Case(SHIFT_DATA):
                 m.d.sync += [
                     sda_dir.eq(~shift_reg[-1]),
-                    shift_reg.eq(Cat(C(0,1), shift_reg[:-1])),
-                    timer.eq(T_LOW),
-                    rtn_state.eq(CLOCK_HIGH),
-                    state.eq(SPIN)
+                    shift_reg.eq(Cat(C(0,1), shift_reg[:-1]))
                 ]
+                delay(T_LOW, CLOCK_HIGH)
+            # Set SCL high
             with m.Case(CLOCK_HIGH):
                 m.d.sync += scl_dir.eq(0)
                 with m.If(scl):
@@ -212,43 +218,25 @@ class I2cMaster(Elaboratable):
                     with m.Elif(((bit_count == 17) & wr_cyc) | (bit_count == 26) | (bit_count == 35)):
                         m.d.sync += self.data_nack.eq(sda)
                     with m.If(((bit_count == 18) & self.read) | (bit_count == 36) | (self.short_wr & (bit_count == 27))):
-                        m.d.sync += [
-                            timer.eq(T_SU_STO),
-                            rtn_state.eq(STOP),
-                            state.eq(SPIN)
-                        ]
+                        delay(T_SU_STO, STOP)
                     with m.Else():
                         with m.If(bit_count != 17):
                             m.d.sync += read_data.eq(Cat(sda,read_data[:7]))
-                        m.d.sync += [
-                            timer.eq(T_HIGH),
-                            rtn_state.eq(CLOCK_LOW),
-                            state.eq(SPIN)
-                        ]
+                        delay(T_HIGH, CLOCK_LOW)
+            # Stop bit
             with m.Case(STOP):
                 m.d.sync += sda_dir.eq(0)
                 with m.If(sda):
                     with m.If(self.read):
                         with m.If(wr_cyc):
                             # TODO repeated read
-                            m.d.sync += [
-                                timer.eq(T_SU_STA),
-                                rtn_state.eq(START),
-                                state.eq(SPIN)
-                            ]
+                            delay(T_SU_STA, START)
                         with m.Else():
-                            m.d.sync += [
-                                self.dout.eq(read_data),
-                                timer.eq(T_SU_STA),
-                                rtn_state.eq(IDLE),
-                                state.eq(SPIN)
-                            ]
+                            m.d.sync += self.dout.eq(read_data)
+                            delay(T_SU_STA, IDLE)
                     with m.Else():
-                        m.d.sync += [
-                            timer.eq(T_SU_STA),
-                            rtn_state.eq(IDLE),
-                            state.eq(SPIN)
-                        ]
+                        delay(T_SU_STA, IDLE)
+            # Wait state
             with m.Case(SPIN):
                 with m.If(timer > 0):
                     m.d.sync += timer.eq(timer - 1)
