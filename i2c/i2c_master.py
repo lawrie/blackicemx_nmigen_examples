@@ -231,6 +231,7 @@ class I2cMaster(Elaboratable):
                 m.d.sync += sda_dir.eq(0)
                 with m.If(sda):
                     with m.If(self.read):
+                        m.d.sync += wr_cyc.eq(0)
                         with m.If(wr_cyc):
                             delay(Mux(self.rep_start, T_SU_STA - T_SU_STO, T_SU_STA), START)
                         with m.Else():
