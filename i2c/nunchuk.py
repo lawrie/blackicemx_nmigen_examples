@@ -38,11 +38,16 @@ class Top(Elaboratable):
 
         m.d.comb += [
             i2c.addr.eq(0x52),
+            # transaction twice per time period
             i2c.valid.eq(timer[:-1].all()),
+            # First txn is write, second is read
             i2c.read.eq(timer[-1]),
             i2c.rep_start.eq(0),
+            # All writes are short
             i2c.short_wr.eq(1),
+            # Reads do not have write cycle
             i2c.read_only.eq(1),
+            # Send 0x40 for initialsation, else read register 0
             i2c.reg.eq(Mux(started, 0x00, 0x40)),
             i2c.din.eq(0x00),
             i2c.din2.eq(0x00),
