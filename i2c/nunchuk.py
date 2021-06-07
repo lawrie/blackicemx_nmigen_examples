@@ -32,7 +32,7 @@ class Top(Elaboratable):
 
         m.submodules.i2c = i2c = I2cMaster()
 
-        started = Signal()
+        started = Signal(reset=0)
 
         m.d.sync += timer.eq(timer + 1)
 
@@ -42,6 +42,7 @@ class Top(Elaboratable):
             i2c.valid.eq(timer[:-1].all()),
             # First txn is write, second is read
             i2c.read.eq(timer[-1]),
+            # Don't use repeated starts
             i2c.rep_start.eq(0),
             # All writes are short
             i2c.short_wr.eq(1),
@@ -59,6 +60,7 @@ class Top(Elaboratable):
             leds8_2.eq(i2c.dout)
         ]
 
+        # Set started after first time period elapses
         with m.If(timer.all()):
             m.d.sync += started.eq(1)
 
