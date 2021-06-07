@@ -6,8 +6,8 @@ from i2c_master import I2cMaster
 
 i2c_pmod = [
     Resource("i2c", 0,
-            Subsignal("sda", Pins("7", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
-            Subsignal("scl", Pins("8", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
+            Subsignal("sda", Pins("8", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")),
+            Subsignal("scl", Pins("7", conn=("pmod",5)), Attrs(IO_STANDARD="SB_LVCMOS")))
 ]
 
 leds8_1_pmod = [
@@ -28,26 +28,22 @@ class Top(Elaboratable):
 
         m = Module()
 
-        timer = Signal(28)
+        timer = Signal(16)
 
         m.submodules.i2c = i2c = I2cMaster()
 
-        ack = Signal()
-
-        # Scan for i2c addresses
-        with m.If(~i2c.addr_nack & ~i2c.addr[0]):
-            m.d.sync += leds8_2.eq(i2c.addr)
+        started = Signal()
 
         m.d.sync += timer.eq(timer + 1)
 
         m.d.comb += [
-            i2c.addr.eq(timer[-8:]),
-            #i2c.addr.eq(0x52),
-            i2c.valid.eq(timer[:-8].all()),
-            i2c.read.eq(0),
+            i2c.addr.eq(0x52),
+            i2c.valid.eq(timer[:-1].all()),
+            i2c.read.eq(timer[-1]),
             i2c.rep_start.eq(0),
             i2c.short_wr.eq(1),
-            i2c.reg.eq(0x40),
+            i2c.read_only.eq(1),
+            i2c.reg.eq(Mux(started, 0x00, 0x40)),
             i2c.din.eq(0x00),
             i2c.din2.eq(0x00),
             leds[0].eq(i2c.rdy),
@@ -55,8 +51,11 @@ class Top(Elaboratable):
             leds[2].eq(i2c.data_nack),
             leds[3].eq(i2c.init),
             leds8_1.eq(i2c.diag),
-            #leds8_2.eq(i2c.addr)
+            leds8_2.eq(i2c.dout)
         ]
+
+        with m.If(timer.all()):
+            m.d.sync += started.eq(1)
 
         return m
 

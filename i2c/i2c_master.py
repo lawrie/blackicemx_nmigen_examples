@@ -9,7 +9,7 @@ class I2cMaster(Elaboratable):
         # inputs
         self.valid     = Signal()         # Strobe to start new transaction
         self.read      = Signal()         # Set for reads
-        self.rep_read  = Signal()         # Set for repeated reads (not tested)
+        self.rep_start = Signal()         # Set for repeated starts (not tested)
         self.read_only = Signal()         # Set for reads without write cycle
         self.short_wr  = Signal()         # Set for short write
         self.addr      = Signal(self.AW)  # The 7-bit i2c address
@@ -192,9 +192,9 @@ class I2cMaster(Elaboratable):
                 with m.If(~sda):
                     with m.If(self.read):
                         with m.If(wr_cyc):
-                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 1), self.rep_read, C(1,1), self.reg, C(1,0), C(0,0), self.addr]))
+                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 1), self.rep_start, C(1,1), self.reg, C(1,0), C(0,0), self.addr]))
                         with m.Else():
-                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 2), C(0,1), C(0xff,self.DW),C(1,1),C(1,1),self.addr]))
+                            m.d.sync += shift_reg.eq(Cat([C(0,self.DW * 2 + 2), C(1,1), C(0xff,self.DW),C(1,1),C(1,1),self.addr]))
                     with m.Else():
                         m.d.sync += shift_reg.eq(Cat([C(1,1), self.din2, C(1,1), self.din, C(1,1), self.reg, C(1,1), C(0,1), self.addr]))
                     m.d.sync += bit_count.eq(0)
@@ -232,8 +232,7 @@ class I2cMaster(Elaboratable):
                 with m.If(sda):
                     with m.If(self.read):
                         with m.If(wr_cyc):
-                            # TODO repeated read
-                            delay(T_SU_STA, START)
+                            delay(Mux(self.rep_start, T_SU_STA - T_SU_STO, T_SU_STA), START)
                         with m.Else():
                             m.d.sync += self.dout.eq(read_data)
                             delay(T_SU_STA, IDLE)
