@@ -32,7 +32,6 @@ class SpiMem(Elaboratable):
 
         r_copi       = Signal()
         r_sclk       = Signal(2)
-        rise_sclk    = Signal()
 
         # Drive outputs
         m.d.comb += [
@@ -40,8 +39,7 @@ class SpiMem(Elaboratable):
             self.wr.eq(r_req_write),
             self.cipo.eq(r_data[-1]),
             self.dout.eq(r_data),
-            self.addr.eq(r_addr[:-1]),
-            rise_sclk.eq(r_sclk == 0b10)
+            self.addr.eq(r_addr[:-1])
         ]
 
         # De-glitch and edge detection
@@ -58,7 +56,7 @@ class SpiMem(Elaboratable):
                 r_bit_count.eq(self.addr_bits + 7)
             ]
         with m.Else(): # csn == 0
-            with m.If(rise_sclk): # rising sclk
+            with m.If(r_sclk == 0b01): # rising sclk
                 # If writing shift in data
                 m.d.sync += r_data.eq(Mux(r_req_read, self.din, Cat(r_copi, r_data[:-1])))
                 with m.If(r_bit_count[-1] == 0): # Address bits
