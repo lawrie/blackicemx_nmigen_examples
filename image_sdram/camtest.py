@@ -245,7 +245,7 @@ class CamTest(Elaboratable):
             ims.i_x.eq(camread.row[1:]),
             ims.i_y.eq(camread.col[1:]),
             ims.i_r.eq(camread.pixel_data[11:]),
-            ims.i_g.eq(camread.pixel_data[5:11]),
+            ims.i_g.eq(camread.pixel_data[6:11]),
             ims.i_b.eq(camread.pixel_data[0:5]),
             ims.edge.eq(edge_thresh != 0),
             ims.invert.eq(invert),
@@ -276,7 +276,7 @@ class CamTest(Elaboratable):
                 max_r.eq(0),
                 max_g.eq(0),
                 max_b.eq(0),
-                leds.eq(leds+1)
+                #leds.eq(leds+1)
             ]
 
         # VGA signal generator.
