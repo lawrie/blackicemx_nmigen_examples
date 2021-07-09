@@ -95,11 +95,6 @@ class CamTest(Elaboratable):
         oled_resn = oled.oled_resn
         oled_csn  = oled.oled_csn
 
-        # Frame buffer
-        buffer = Memory(width=16, depth=80 * 60)
-        m.submodules.r = r = buffer.read_port()
-        m.submodules.w = w = buffer.write_port()
-        
         # Camera config
         camconfig = CamConfig()
         m.submodules.camconfig = camconfig
@@ -115,10 +110,6 @@ class CamTest(Elaboratable):
             camread.href.eq(ov7670.cam_HREF),
             camread.vsync.eq(ov7670.cam_VSYNC),
             camread.p_clock.eq(ov7670.cam_PCLK),
-            w.en.eq(camread.pixel_valid),
-            w.addr.eq(((camread.row[3:] - 0) * 80) + camread.col[3:]),
-            w.data.eq(camread.pixel_data),
-            r.addr.eq(((59 - st7789.x[2:]) * 80) + st7789.y[2:]),
             st7789.color.eq(mem.data_out),
             camconfig.start.eq(btn1),
             ov7670.cam_SIOC.eq(camconfig.sioc),
@@ -136,20 +127,19 @@ class CamTest(Elaboratable):
 
         raddr = Signal(20)
         waddr = Signal(20)
-
-        m.d.comb += [
-            raddr.eq(((239 - st7789.x) * 320) + st7789.y),
-            waddr.eq((camread.row[1:] * 320) + camread.col[1:])
-        ]
+        sync  = Signal()
 
         # Write to SDRAM
         m.d.comb += [
+            sync.eq(~div[2]),
+            raddr.eq(((239 - st7789.x) * 320) + st7789.y),
+            waddr.eq((camread.row[1:] * 320) + camread.col[1:]),
             mem.init.eq(~pll.locked), # Use pll not locked as signal to initialise SDRAM
-            mem.sync.eq(~div[2]),      # Sync with 25MHz clock
+            mem.sync.eq(sync),      # Sync with 25MHz clock
             mem.address.eq(Mux(st7789.next_pixel, raddr, waddr)),
             mem.data_in.eq(camread.pixel_data),
-            mem.req_read.eq(~div[2] & st7789.next_pixel), # Always read when pixel requested
-            mem.req_write.eq(~div[2] & ~st7789.next_pixel & pixel_valid), # Delay write one cycle if needed
+            mem.req_read.eq(sync & st7789.next_pixel), # Always read when pixel requested
+            mem.req_write.eq(sync & ~st7789.next_pixel & pixel_valid), # Delay write one cycle if needed
             leds16.eq(mem.data_out)
         ]
 
