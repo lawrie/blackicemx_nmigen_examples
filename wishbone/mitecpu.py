@@ -59,9 +59,11 @@ class MiteCPU(Elaboratable):
         # Execution state machine
         with m.FSM() as fsm:
             with m.State("FETCH"):
-                m.next = "READ"
-            with m.State("READ"):
-                m.next = "EXECUTE"
+                m.next = "DATA"
+            with m.State("DATA"):
+                # Allow multiple cycles for code fetch (e.g. if using SPI flash)
+                with m.If(code.ack):
+                    m.next = "EXECUTE"
             with m.State("EXECUTE"):
                 # Delay execution for led diagnostics
                 m.d.sync += dc.eq(dc + 1)
@@ -92,9 +94,9 @@ class MiteCPU(Elaboratable):
         m.d.comb += [
             code.cyc.eq(fsm.ongoing("FETCH")),
             code.stb.eq(code.cyc),
-            data.cyc.eq(fsm.ongoing("READ") | ((instr[8:] == 0b011) & fsm.ongoing("EXECUTE"))),
+            data.cyc.eq(fsm.ongoing("DATA") & code.ack),
             data.stb.eq(data.cyc),
-            data.we.eq(fsm.ongoing("EXECUTE"))
+            data.we.eq(instr[8:] == 0b011)
         ]
 
         return m
