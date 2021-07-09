@@ -53,7 +53,6 @@ class Top(Elaboratable):
 
         # RAM test
         addr   = Signal(20, reset=0) # word address
-        din    = Signal(16)          # data to be written to SDRAM
         count  = Signal(5,  reset=0) # width control speed of read back
         we     = Signal(1,  reset=0) # request write
         oe     = Signal(1,  reset=0) # request read
@@ -65,11 +64,10 @@ class Top(Elaboratable):
             mem.init.eq(~pll.locked), # Use pll not locked as signal to initialise SDRAM 
             mem.sync.eq(div[2]),      # Sync with 8MHz clock
             mem.address.eq(addr),
-            mem.data_in.eq(din),
             mem.req_read.eq(oe),
             mem.req_write.eq(we),
-            din.eq(addr[4:]),         # Write most significant 16 bits of address
-            leds16.eq(mem.data_out)   # Put the data read on the debugg leds
+            mem.data_in.eq(addr[4:]), # Write most significant 16 bits of address
+            leds16.eq(mem.data_out)   # Put the data read on the debug leds
         ]
 
         # Set the error flag if read gives the wrong value
