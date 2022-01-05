@@ -74,18 +74,7 @@ class TopVGATest(Elaboratable):
                 bits_x            = 16, # Play around with the sizes because sometimes
                 bits_y            = 16  # a smaller/larger value will make it pass timing.
             )
-            with m.If(vga.o_beam_y < 240):
-                m.d.comb += [
-                    vga.i_r.eq(0xff),
-                    vga.i_g.eq(0),
-                    vga.i_b.eq(0)
-                ]
-            with m.Else():
-                m.d.comb += [
-                    vga.i_r.eq(0),
-                    vga.i_g.eq(0xff),
-                    vga.i_b.eq(0)
-                ]
+
             m.d.comb += [
                 vga.i_clk_en.eq(1),
                 vga.i_test_picture.eq(1),
