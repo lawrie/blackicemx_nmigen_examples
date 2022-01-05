@@ -54,14 +54,6 @@ class TopVGATest(Elaboratable):
 
             platform.add_clock_constraint(cd_pixel.clk, pixel_f)
 
-            # VGA signal generator.
-            vga_r = Signal(8)
-            vga_g = Signal(8)
-            vga_b = Signal(8)
-            vga_hsync = Signal()
-            vga_vsync = Signal()
-            vga_blank = Signal()
-
             m.submodules.vga = vga = VGA(
                 resolution_x      = self.timing.x,
                 hsync_front_porch = hsync_front_porch,
@@ -78,22 +70,16 @@ class TopVGATest(Elaboratable):
             m.d.comb += [
                 vga.i_clk_en.eq(1),
                 vga.i_test_picture.eq(1),
-                vga_r.eq(vga.o_vga_r),
-                vga_g.eq(vga.o_vga_g),
-                vga_b.eq(vga.o_vga_b),
-                vga_hsync.eq(vga.o_vga_hsync),
-                vga_vsync.eq(vga.o_vga_vsync),
-                vga_blank.eq(vga.o_vga_blank),
             ]
 
             vga_out = platform.request("vga")
 
             m.d.comb += [
-                vga_out.red.eq(vga_r[4:]),
-                vga_out.green.eq(vga_g[4:]),
-                vga_out.blue.eq(vga_b[4:]),
-                vga_out.hs.eq(vga_hsync),
-                vga_out.vs.eq(vga_vsync)
+                vga_out.red.eq(vga.o_vga_r[4:]),
+                vga_out.green.eq(vga.o_vga_g[4:]),
+                vga_out.blue.eq(vga.o_vga_b[4:]),
+                vga_out.hs.eq(vga.o_vga_hsync),
+                vga_out.vs.eq(vga.o_vga_vsync)
             ]
 
         return m
