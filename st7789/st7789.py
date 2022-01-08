@@ -1,6 +1,6 @@
 from nmigen import *
+from nmigen.utils import bits_for
 
-C_CLK_MHZ      = 25
 C_COLOR_BITS   = 16
 C_X_SIZE       = 240
 C_Y_SIZE       = 240
@@ -46,13 +46,15 @@ class ST7789(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        C_CLK_MHZ = int(platform.default_clk_frequency / 1000000)
+
         index        = Signal(11, reset = 0)
         data         = Signal(8,  reset = C_NOP)
         dc           = Signal(1,  reset = 1)
         byte_toggle  = Signal(1,  reset = 0)
         init         = Signal(1,  reset = 1)
         num_args     = Signal(5,  reset = 0)
-        delay_cnt    = Signal(28, reset = self.reset_delay * C_CLK_MHZ)
+        delay_cnt    = Signal(bits_for(self.reset_delay * C_CLK_MHZ) + 1, reset = self.reset_delay * C_CLK_MHZ)
         arg          = Signal(6,  reset = 1)
         delay_set    = Signal(1,  reset = 0)
         last_cmd     = Signal(8,  reset = 0)
@@ -77,7 +79,7 @@ class ST7789(Elaboratable):
                 delay_cnt.eq(delay_cnt - 1),
                 resn.eq(1)
             ]
-        with m.If(index[4:] != C_INIT_SIZE):
+        with m.Elif(index[4:] != C_INIT_SIZE):
             m.d.sync += index.eq(index+1)
             with m.If(index[0:4] == 0): # Start of byte
                 with m.If(init): # Still initialization
@@ -120,7 +122,8 @@ class ST7789(Elaboratable):
                     m.d.sync += [
                         dc.eq(1),
                         byte_toggle.eq(~byte_toggle),
-                        clken.eq(1)
+                        clken.eq(1),
+                        index[4:].eq(0)
                     ]
                     with m.If(byte_toggle):
                         m.d.sync += [
