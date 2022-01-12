@@ -25,7 +25,7 @@ class ST7789Test(Elaboratable):
         oled_resn = oled.oled_resn
         oled_csn  = oled.oled_csn
 
-        st7789 = ST7789(reset_delay=150000)
+        st7789 = ST7789(reset_delay=100000,reset_period=100000)
         m = Module()
         m.submodules.st7789 = st7789
        

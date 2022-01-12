@@ -26,7 +26,7 @@ def readhex(filename):
     return l
 
 class ST7789(Elaboratable):
-    def __init__(self, reset_delay):
+    def __init__(self, reset_delay, reset_period=100000):
         self.color          = Signal(C_COLOR_BITS)
         self.x              = Signal(C_X_BITS)
         self.y              = Signal(C_Y_BITS)
@@ -37,6 +37,7 @@ class ST7789(Elaboratable):
         self.spi_dc         = Signal()
         self.spi_resn       = Signal()
         self.reset_delay    = reset_delay
+        self.reset_period   = reset_period
 
     # Used for simulation
     def ports(self):
@@ -54,11 +55,12 @@ class ST7789(Elaboratable):
         byte_toggle  = Signal(1,  reset = 0)
         init         = Signal(1,  reset = 1)
         num_args     = Signal(5,  reset = 0)
-        delay_cnt    = Signal(bits_for(self.reset_delay * C_CLK_MHZ) + 1, reset = self.reset_delay * C_CLK_MHZ)
+        delay_cnt    = Signal(bits_for(self.reset_delay * C_CLK_MHZ), reset = self.reset_delay * C_CLK_MHZ)
+        reset_cnt    = Signal(bits_for(self.reset_period * C_CLK_MHZ), reset = self.reset_period * C_CLK_MHZ)
         arg          = Signal(6,  reset = 1)
         delay_set    = Signal(1,  reset = 0)
         last_cmd     = Signal(8,  reset = 0)
-        resn         = Signal(1,  reset = 0)
+        resn         = Signal(1,  reset = 1)
         clken        = Signal(1,  reset = 0)
         next_byte    = Signal(8)
 
@@ -74,7 +76,12 @@ class ST7789(Elaboratable):
              next_byte.eq(oled_init[index[4:]])
         ]
 
-        with m.If(delay_cnt[-1] == 0): # Delay
+        with m.If(reset_cnt >  0): # Reset period
+            m.d.sync += [
+                reset_cnt.eq(reset_cnt - 1),
+                resn.eq(0)
+            ]
+        with m.Elif(delay_cnt > 0): # Delay
             m.d.sync += [
                 delay_cnt.eq(delay_cnt - 1),
                 resn.eq(1)
