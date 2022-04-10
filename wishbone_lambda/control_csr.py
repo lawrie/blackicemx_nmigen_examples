@@ -31,7 +31,7 @@ class ControlPeripheral(Peripheral, Elaboratable):
         self.reset = bank.csr(1,"rw")
         self.halt  = bank.csr(1,"rw")
 
-        self._bridge = self.bridge(data_width=data_width, granularity=granularity, alignment=0)
+        self._bridge = self.bridge(data_width=data_width, granularity=granularity)
 
         self.bus = self._bridge.bus
 
