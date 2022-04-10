@@ -108,7 +108,7 @@ class MiteCPU(Elaboratable):
                 m.d.sync += [
                     ip.eq(0xff)
                 ]
-                with m.If(~control.reset.w_data):
+                with m.If(~control.reset.r_data):
                     m.next = "FETCH"
             with m.State("FETCH"):
                 with m.If(bus.ack):
@@ -123,9 +123,9 @@ class MiteCPU(Elaboratable):
                     m.next = "EXECUTE"
             with m.State("EXECUTE"):
                 # Delay execution for led diagnostics
-                with m.If(control.reset.w_data):
+                with m.If(control.reset.r_data):
                     m.next = "RESET"
-                with m.Elif(~control.halt.w_data):
+                with m.Elif(~control.halt.r_data):
                     m.d.sync += dc.eq(dc + 1)
                     with m.If(dc.all()):
                         # Advance instruction pointer
