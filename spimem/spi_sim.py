@@ -16,7 +16,7 @@ class TestSPI(Elaboratable):
         m.d.comb += [
             spimem.sclk.eq(timer[0]),
             #spimem.copi.eq((timer == 0x30) | (timer == 0x10)), # read address 1
-            spimem.copi.eq((timer == 0x30) | (timer == 0x40)), # write address 1, dout = 1
+            spimem.copi.eq((timer == 0x2F) | (timer == 0x3F)), # write address 1, dout = 1
             spimem.csn.eq(timer == 0),
             spimem.din.eq(0x55)
         ]
@@ -32,13 +32,16 @@ if __name__ == "__main__":
 
     def process():
 
-        for i in range(67):
+        for i in range(66):
+            wr = yield test.spimem.wr
+            dout = yield test.spimem.dout
+            if wr:
+                print("dout:", dout)
+
             yield
 
         addr = yield test.spimem.addr
         print("addr:", addr)
-        dout = yield test.spimem.dout
-        print("dout:", dout)
 
     sim.add_sync_process(process)
     with sim.write_vcd("test.vcd", "test.gtkw"):
